@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"pos-api/internal/models"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
+
+	customErrors "pos-api/internal/pkg/errors" // Import custom errors
 )
 
 // ProductRequest mendefinisikan DTO untuk membuat atau mengupdate produk.
@@ -69,6 +72,10 @@ func (s *productService) CreateProduct(req ProductRequest) (*models.Product, err
 
 	// 3. Simpan ke Repository
 	if err := s.repo.CreateProduct(&product); err != nil {
+		// Pengecekan Duplikat Key (Constraint Conflict)
+		if strings.Contains(err.Error(), "unique constrain") || strings.Contains(err.Error(), "duplicate key") {
+			return nil, customErrors.ErrConflict // <-- Mengembalikan Custom Error 409
+		}
 		return nil, errors.New("gagal membuat produk: " + err.Error())
 	}
 
@@ -80,7 +87,7 @@ func (s *productService) GetProduct(id uint) (*models.Product, error) {
 	product, err := s.repo.GetProductByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("produk tidak ditemukan")
+			return nil, customErrors.ErrNotFound // <-- Mengembalikan Custom Error 404
 		}
 		return nil, errors.New("gagal mengambil produk")
 	}
@@ -116,7 +123,7 @@ func (s *productService) UpdateProduct(id uint, req ProductRequest) (*models.Pro
 	product, err := s.repo.GetProductByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("produk tidak ditemukan")
+			return nil, customErrors.ErrNotFound // <-- Mengembalikan Custom Error 404
 		}
 		return nil, errors.New("gagal mengambil produk untuk di update")
 	}
@@ -136,8 +143,13 @@ func (s *productService) UpdateProduct(id uint, req ProductRequest) (*models.Pro
 
 	// 4. Simpan perubahan ke repository
 	if err := s.repo.UpdateProduct(product); err != nil {
+		// PERHATIAN: Di sini kita harus memeriksa apakah error GORM adalah Conflict (Duplikat)
+		// Pemeriksaan ini biasanya melibatkan pengecekan string error database (tergantung driver)
 		// Asumsi error bisa karena CategoryID tidak valid atau SKU duplikat
-		return nil, errors.New("gagal mengupdate produk: " + err.Error())
+		if strings.Contains(err.Error(), "duplikat key value") || strings.Contains(err.Error(), "unique constraint") {
+			return nil, customErrors.ErrConflict // <-- Mengembalikan Custom Error 409
+		}
+		return nil, fmt.Errorf("gagal mengupdate produk: %w", err)
 	}
 
 	// Ambil kembali produk dengan relasi yang sudah ter-preload (Category)
@@ -153,6 +165,13 @@ func (s *productService) UpdateProduct(id uint, req ProductRequest) (*models.Pro
 func (s *productService) DeleteProduct(id uint) error {
 	err := s.repo.DeleteProduct(id)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return customErrors.ErrNotFound // <-- Mengembalikan Custom Error 404
+		}
+		// PENTING: Cek Foreign Key Constraint Violation (misal, produk sudah ada di transaksi)
+		if strings.Contains(err.Error(), "foreign key constraint") {
+			return customErrors.ErrForeignKeyConstraint // <-- Mengembalikan Custom Error
+		}
 		return errors.New("gagal menghapus produk: " + err.Error())
 	}
 

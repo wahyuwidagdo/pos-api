@@ -3,12 +3,15 @@ package services
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"pos-api/internal/models"
 	"pos-api/internal/repositories"
 
 	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
+
+	customErrors "pos-api/internal/pkg/errors" // Import custom errors
 )
 
 // CategoryRequest mendefinisikan DTO untuk kategori.
@@ -47,7 +50,10 @@ func (s *categoryService) CreateCategory(req CategoryRequest) (*models.Category,
 	}
 
 	if err := s.repo.CreateCategory(&category); err != nil {
-		// Asumsi: Jika error adalah duplikat/constraint, GORM akan memberikan error.
+		// Pengecekan Duplikat Key (Constraint Conflict)
+		if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "duplicate key") {
+			return nil, customErrors.ErrConflict // <-- Mengembalikan Custom Error 409
+		}
 		return nil, fmt.Errorf("gagal membuat kategori: %w", err)
 	}
 
@@ -58,7 +64,7 @@ func (s *categoryService) GetCategory(id uint) (*models.Category, error) {
 	category, err := s.repo.GetCategoryByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("kategori tidak ditemukan")
+			return nil, customErrors.ErrNotFound // <-- Mengembalikan Custom Error 404
 		}
 
 		return nil, fmt.Errorf("gagal mengambil kategori: %w", err)
@@ -84,7 +90,7 @@ func (s *categoryService) UpdateCategory(id uint, req CategoryRequest) (*models.
 	category, err := s.repo.GetCategoryByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("kategori tidak ditemukan")
+			return nil, customErrors.ErrNotFound // <-- Mengembalikan Custom Error 404
 		}
 		return nil, fmt.Errorf("gagal mengambil kategori untuk diupdate: %w", err)
 	}
@@ -92,6 +98,10 @@ func (s *categoryService) UpdateCategory(id uint, req CategoryRequest) (*models.
 	category.Name = req.Name
 
 	if err := s.repo.UpdateCategory(category); err != nil {
+		// Pengecekan Duplikat Key (Constraint Conflict)
+		if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "duplicate key") {
+			return nil, customErrors.ErrConflict // <-- Mengembalikan Custom Error 409
+		}
 		return nil, fmt.Errorf("gagal mengupdate kategori: %w", err)
 	}
 
@@ -103,6 +113,13 @@ func (s *categoryService) DeleteCategory(id uint) error {
 	// Untuk MVP, kita biarkan database constraint (foreign key) yang menangani errornya.
 	err := s.repo.DeleteCategory(id)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return customErrors.ErrNotFound // <-- Mengembalikan Custom Error 404
+		}
+		// PENTING: Cek Foreign Key Constraint Violation (misal, produk masih menggunakan kategori ini)
+		if strings.Contains(err.Error(), "foreign key constraint") {
+			return customErrors.ErrForeignKeyConstraint // <-- Mengembalikan Custom Error
+		}
 		return fmt.Errorf("gagal menghapus kategori: %w", err)
 	}
 

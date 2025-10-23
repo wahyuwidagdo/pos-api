@@ -4,6 +4,8 @@ import (
 	"pos-api/internal/services"
 	"strconv"
 
+	customErrors "pos-api/internal/pkg/errors" // Import custom errors
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -26,8 +28,10 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 
 	product, err := h.service.CreateProduct(req)
 	if err != nil {
-		// Asumsikan error dari service adalah error bisnis (validasi, duplikat)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		if customErrors.Is(err, customErrors.ErrConflict) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "SKU atau nama produk sudah ada (duplikat)."}) // 409
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Gagal membuat produk: " + err.Error()})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -45,9 +49,8 @@ func (h *ProductHandler) GetProduct(c *fiber.Ctx) error {
 
 	product, err := h.service.GetProduct(uint(id))
 	if err != nil {
-		// Error spesifik dari service (tidak ditemukan)
-		if err.Error() == "produk tidak ditemukan" {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		if customErrors.Is(err, customErrors.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Produk tidak ditemukan."}) // 404
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil produk"})
 	}
@@ -100,11 +103,16 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 	// 3. Panggil service untuk update
 	updatedProduct, err := h.service.UpdateProduct(uint(id), req)
 	if err != nil {
-		// Penanganan error
-		if err.Error() == "produk tidak ditemukan" {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+		// --- Custom Error Handling ---
+		if customErrors.Is(err, customErrors.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Produk tidak ditemukan"}) // 404
 		}
-		// Asumsikan error lain adalah validasi/bisnis/database
+		if customErrors.Is(err, customErrors.ErrConflict) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "SKU atau nama produk sudah ada."}) // 409
+		}
+		// --- End Custom Error Handling ---
+
+		// Default Error
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Gagal mengupdate produk: " + err.Error()})
 	}
 
@@ -123,8 +131,14 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	}
 
 	// 2. Panggil service untuk delete
-	err = h.service.DeleteProduct(uint(id))
-	if err != nil {
+	if err := h.service.DeleteProduct(uint(id)); err != nil {
+		if customErrors.Is(err, customErrors.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Produk yang ingin dihapus tidak ditemukan."}) // 404
+		}
+		if customErrors.Is(err, customErrors.ErrForeignKeyConstraint) {
+			// Produk tidak bisa dihapus karena masih terkait dengan entitas lain (misalnya transaksi)
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Produk tidak dapat dihapus karena sudah digunakan dalam transaksi."}) // 409
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghapus produk: " + err.Error()})
 	}
 
