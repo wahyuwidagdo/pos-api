@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 
@@ -50,6 +51,19 @@ func main() {
 	// 3. Inisiasi Fiber App
 	app := fiber.New()
 	app.Use(logger.New())
+
+	// Terapkan CORS Middleware <-- HARUS ADA DI SINI
+	app.Use(cors.New(cors.Config{
+		// Izinkan request hanya dari domain/port frontend Anda (misalnya 5173 atau 3001)
+		// Ganti 'http://localhost:5173' dengan port tempat React Anda berjalan
+		AllowOrigins: "http://localhost:5173, http://127.0.0.1:5173",
+
+		// Izinkan metode HTTP yang dibutuhkan
+		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+
+		// Izinkan Header Kritis (termasuk Authorization untuk JWT)
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+	}))
 
 	// 4. Inisiasi Dependency Injection (DI)
 	// --- AUTH Module ---
