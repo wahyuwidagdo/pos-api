@@ -16,7 +16,17 @@ func NewCategoryHandler(s services.CategoryService) *CategoryHandler {
 	return &CategoryHandler{service: s}
 }
 
-// CreateCategory handles POST /categories
+// Categories handles POST /categories
+// @Summary Create Kategori
+// @Description Membuat kategori baru.
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param category body services.CategoryRequest true "Kredensial Category"
+// @Success 200 {object} map[string]string "Berhasil Create Category"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /categories [post]
 func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 	var req services.CategoryRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -37,7 +47,17 @@ func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 	})
 }
 
-// GetCategory handles GET /categories/:id
+// Categories handles GET /categories/:id
+// @Summary Get Kategori
+// @Description Mengambil 1 kategori berdasarkan id.
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param category body services.CategoryRequest true "Kredensial Category"
+// @Success 200 {object} map[string]string "Berhasil Get Category"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /categories/:id [get]
 func (h *CategoryHandler) GetCategory(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
@@ -55,7 +75,17 @@ func (h *CategoryHandler) GetCategory(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": category})
 }
 
-// ListCategories handles GET /categories
+// Categories handles GET /categories
+// @Summary Get All Kategori
+// @Description Mengambil semua daftar kategori.
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param category body services.CategoryRequest true "Kredensial Category"
+// @Success 200 {object} map[string]string "Berhasil Get All Categories"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /categories [get]
 func (h *CategoryHandler) ListCategories(c *fiber.Ctx) error {
 	categories, err := h.service.ListCategories()
 	if err != nil {
@@ -68,7 +98,17 @@ func (h *CategoryHandler) ListCategories(c *fiber.Ctx) error {
 	})
 }
 
-// UpdateCategory handles PUT /categories/:id
+// Categories handles PUT /categories/:id
+// @Summary Update Kategori
+// @Description Update 1 kategori berdasarkan id.
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param category body services.CategoryRequest true "Kredensial Category"
+// @Success 200 {object} map[string]string "Berhasil Create Category"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /categories/:id [put]
 func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
@@ -98,7 +138,17 @@ func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 	})
 }
 
-// DeleteCategory handles DELETE /categories/:id
+// Categories handles DELETE /categories/:id
+// @Summary Delete Kategori
+// @Description Delete 1 kategori berdasarkan id.
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param category body services.CategoryRequest true "Kredensial Category"
+// @Success 200 {object} map[string]string "Berhasil Delete Category"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /categories/:id [delete]
 func (h *CategoryHandler) DeleteCategory(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {

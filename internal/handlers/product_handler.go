@@ -19,7 +19,17 @@ func NewProductHandler(s services.ProductService) *ProductHandler {
 	return &ProductHandler{service: s}
 }
 
-// CreateProduct menangani POST /api/v1/products
+// Products handles POST /products
+// @Summary Create Produk
+// @Description Membuat produk baru.
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param product body services.ProductRequest true "Kredensial Product"
+// @Success 200 {object} map[string]string "Berhasil Create Product"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /products [post]
 func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 	var req services.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -40,7 +50,17 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 	})
 }
 
-// GetProduct menangani GET /api/v1/products/:id
+// Products handles GET /products/:id
+// @Summary Get Produk
+// @Description Mengambil 1 produk berdasarkan id.
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param product body services.ProductRequest true "Kredensial Product"
+// @Success 200 {object} map[string]string "Berhasil Get Product"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /products/:id [get]
 func (h *ProductHandler) GetProduct(c *fiber.Ctx) error {
 	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
 	if err != nil {
@@ -60,7 +80,17 @@ func (h *ProductHandler) GetProduct(c *fiber.Ctx) error {
 	})
 }
 
-// ListProducts menangani GET /api/v1/products
+// Products handles GET /products
+// @Summary Get All Produk
+// @Description Mengambil semua daftar produk.
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param product body services.ProductRequest true "Kredensial Product"
+// @Success 200 {object} map[string]string "Berhasil Get All Product"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /products [get]
 func (h *ProductHandler) ListProducts(c *fiber.Ctx) error {
 	// Ambil query parameter 'page' dan 'pageSize'
 	page, err := strconv.Atoi(c.Query("page", "1"))
@@ -86,7 +116,17 @@ func (h *ProductHandler) ListProducts(c *fiber.Ctx) error {
 	})
 }
 
-// UpdateProduct menangani PUT /api/v1/products/:id
+// Products handles PUT /products/:id
+// @Summary Update Produk
+// @Description Update 1 produk berdasarkan id.
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param product body services.ProductRequest true "Kredensial Product"
+// @Success 200 {object} map[string]string "Berhasil Update Product"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /products/:id [put]
 func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 	// 1. Parse ID dari parameter
 	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
@@ -122,7 +162,17 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 	})
 }
 
-// DeleteProduct menangani DELETE /api/v1/products/:id
+// Products handles DELETE /products/:id
+// @Summary Delete Produk
+// @Description Menghapus 1 produk berdasarkan id.
+// @Tags Products
+// @Accept json
+// @Produce json
+// @Param product body services.ProductRequest true "Kredensial Product"
+// @Success 200 {object} map[string]string "Berhasil Get Product"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /products/:id [delete]
 func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	// 1. Parse ID dari parameter
 	id, err := strconv.ParseUint(c.Params("id"), 10, 32)

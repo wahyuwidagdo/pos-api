@@ -8,12 +8,33 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 
+	_ "pos-api/docs"
 	"pos-api/internal/handlers"
 	"pos-api/internal/repositories"
 	"pos-api/internal/routes"
 	"pos-api/internal/services"
 	"pos-api/pkg/database"
+
+	swagger "github.com/arsmn/fiber-swagger/v2" // Package untuk melayani UI Swagger
 )
+
+// @title POS MVP API Documentation
+// @version 1.0
+// @description Ini adalah dokumentasi untuk Backend API Point of Sale (POS) MVP.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name Support Tim
+// @contact.email support@posmvp.com
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:3000
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 
 func main() {
 	// 1. Muat variable lingkungan
@@ -61,6 +82,10 @@ func main() {
 	})
 
 	apiV1 := app.Group("/api/v1")
+
+	// 5a. SWAGGER ROUTE: Akses di http://localhost:PORT/swagger/*
+	app.Get("/swagger/*", swagger.HandlerDefault)
+
 	// Route Publik (Auth)
 	routes.AuthRoutes(apiV1.Group("/auth"), authHandler)
 

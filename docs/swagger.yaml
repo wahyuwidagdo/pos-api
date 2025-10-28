@@ -1,0 +1,635 @@
+basePath: /api/v1
+definitions:
+  services.AuthRequest:
+    properties:
+      full_name:
+        description: Hanya untuk register
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  services.CategoryRequest:
+    properties:
+      name:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - name
+    type: object
+  services.ItemRequest:
+    properties:
+      product_id:
+        type: integer
+      quantity:
+        type: integer
+    required:
+    - product_id
+    - quantity
+    type: object
+  services.ProductRequest:
+    properties:
+      category_id:
+        type: integer
+      cost:
+        description: Harus lebih besar atau sama dengan 0
+        type: number
+      description:
+        type: string
+      name:
+        maxLength: 100
+        minLength: 3
+        type: string
+      price:
+        description: Harus lebih besar dari 0
+        type: number
+      sku:
+        type: string
+      stock:
+        type: integer
+    required:
+    - category_id
+    - name
+    - price
+    - stock
+    type: object
+  services.TransactionRequest:
+    properties:
+      cash:
+        description: Uang yang dibayarkan pelanggan
+        minimum: 0
+        type: number
+      discount:
+        minimum: 0
+        type: number
+      items:
+        description: Daftar produk yang dibeli
+        items:
+          $ref: '#/definitions/services.ItemRequest'
+        minItems: 1
+        type: array
+      payment_method:
+        description: e.g., "Cash", "QRIS"
+        type: string
+    required:
+    - cash
+    - items
+    - payment_method
+    type: object
+host: localhost:3000
+info:
+  contact:
+    email: support@posmvp.com
+    name: Support Tim
+  description: Ini adalah dokumentasi untuk Backend API Point of Sale (POS) MVP.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: POS MVP API Documentation
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authentikasi pengguna dan mengembalikan JWT token.
+      parameters:
+      - description: Kredensial Login
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/services.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Login
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login Pengguna
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Authentikasi pengguna.
+      parameters:
+      - description: Kredensial Register
+        in: body
+        name: register
+        required: true
+        schema:
+          $ref: '#/definitions/services.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Register
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register Pengguna
+      tags:
+      - Auth
+  /categories:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil semua daftar kategori.
+      parameters:
+      - description: Kredensial Category
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/services.CategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Get All Categories
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get All Kategori
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      description: Membuat kategori baru.
+      parameters:
+      - description: Kredensial Category
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/services.CategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Create Category
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create Kategori
+      tags:
+      - Categories
+  /categories/:id:
+    delete:
+      consumes:
+      - application/json
+      description: Delete 1 kategori berdasarkan id.
+      parameters:
+      - description: Kredensial Category
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/services.CategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Delete Category
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete Kategori
+      tags:
+      - Categories
+    get:
+      consumes:
+      - application/json
+      description: Mengambil 1 kategori berdasarkan id.
+      parameters:
+      - description: Kredensial Category
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/services.CategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Get Category
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Kategori
+      tags:
+      - Categories
+    put:
+      consumes:
+      - application/json
+      description: Update 1 kategori berdasarkan id.
+      parameters:
+      - description: Kredensial Category
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/services.CategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Create Category
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update Kategori
+      tags:
+      - Categories
+  /products:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil semua daftar produk.
+      parameters:
+      - description: Kredensial Product
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/services.ProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Get All Product
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get All Produk
+      tags:
+      - Products
+    post:
+      consumes:
+      - application/json
+      description: Membuat produk baru.
+      parameters:
+      - description: Kredensial Product
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/services.ProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Create Product
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create Produk
+      tags:
+      - Products
+  /products/:id:
+    delete:
+      consumes:
+      - application/json
+      description: Menghapus 1 produk berdasarkan id.
+      parameters:
+      - description: Kredensial Product
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/services.ProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Get Product
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete Produk
+      tags:
+      - Products
+    get:
+      consumes:
+      - application/json
+      description: Mengambil 1 produk berdasarkan id.
+      parameters:
+      - description: Kredensial Product
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/services.ProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Get Product
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Produk
+      tags:
+      - Products
+    put:
+      consumes:
+      - application/json
+      description: Update 1 produk berdasarkan id.
+      parameters:
+      - description: Kredensial Product
+        in: body
+        name: product
+        required: true
+        schema:
+          $ref: '#/definitions/services.ProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Update Product
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update Produk
+      tags:
+      - Products
+  /transactions:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil semua daftar transaksi.
+      parameters:
+      - description: Kredensial Transaction
+        in: body
+        name: transaction
+        required: true
+        schema:
+          $ref: '#/definitions/services.TransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Get All Transaction
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get All Transaksi
+      tags:
+      - Transactions
+    post:
+      consumes:
+      - application/json
+      description: Membuat transaksi baru.
+      parameters:
+      - description: Kredensial Transaction
+        in: body
+        name: transaction
+        required: true
+        schema:
+          $ref: '#/definitions/services.TransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Get Transaction
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create Transaksi
+      tags:
+      - Transactions
+  /transactions/:id:
+    get:
+      consumes:
+      - application/json
+      description: Mengambil 1 transaksi berdasarkan id.
+      parameters:
+      - description: Kredensial Transaction
+        in: body
+        name: transaction
+        required: true
+        schema:
+          $ref: '#/definitions/services.TransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Berhasil Get Transaction
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Validasi/Input Invalid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Kredensial Tidak Valid
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get Transaksi
+      tags:
+      - Transactions
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

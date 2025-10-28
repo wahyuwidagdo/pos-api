@@ -17,7 +17,17 @@ func NewTransactionHandler(s services.TransactionService) *TransactionHandler {
 	return &TransactionHandler{service: s}
 }
 
-// GetTransaction menangani request GET /transactions/:id
+// Transactions handles GET /transactions/:id
+// @Summary Get Transaksi
+// @Description Mengambil 1 transaksi berdasarkan id.
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Param transaction body services.TransactionRequest true "Kredensial Transaction"
+// @Success 200 {object} map[string]string "Berhasil Get Transaction"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /transactions/:id [get]
 func (h *TransactionHandler) GetTransaction(c *fiber.Ctx) error {
 	// 1. Ambil dan parse ID dari URL parameter
 	id, err := c.ParamsInt("id")
@@ -45,7 +55,17 @@ func (h *TransactionHandler) GetTransaction(c *fiber.Ctx) error {
 	})
 }
 
-// ListTransactions menangani request GET /transactions
+// Transactions handles GET /transactions
+// @Summary Get All Transaksi
+// @Description Mengambil semua daftar transaksi.
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Param transaction body services.TransactionRequest true "Kredensial Transaction"
+// @Success 200 {object} map[string]string "Berhasil Get All Transaction"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /transactions [get]
 func (h *TransactionHandler) ListTransactions(c *fiber.Ctx) error {
 	// 1. Panggil Service Layer
 	transactions, err := h.service.ListTransactions()
@@ -62,7 +82,17 @@ func (h *TransactionHandler) ListTransactions(c *fiber.Ctx) error {
 	})
 }
 
-// CreateTransaction menangani request POST /transactions
+// Transactions handles POST /transactions
+// @Summary Create Transaksi
+// @Description Membuat transaksi baru.
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Param transaction body services.TransactionRequest true "Kredensial Transaction"
+// @Success 200 {object} map[string]string "Berhasil Get Transaction"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /transactions [post]
 func (h *TransactionHandler) CreateTransaction(c *fiber.Ctx) error {
 	// 1. Inisiasi DTO dan Binding Request Body
 	var req services.TransactionRequest

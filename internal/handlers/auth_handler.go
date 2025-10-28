@@ -20,7 +20,17 @@ func NewAuthHandler(s services.AuthService) *AuthHandler {
 	return &AuthHandler{service: s}
 }
 
-// Register menangani permintaan pendaftaran pengguna (POST /auth/register).
+// Register handles POST /auth/register
+// @Summary Register Pengguna
+// @Description Authentikasi pengguna.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param register body services.AuthRequest true "Kredensial Register"
+// @Success 200 {object} map[string]string "Berhasil Register"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req services.AuthRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -57,7 +67,17 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	})
 }
 
-// Login menangani permintaan login pengguna (POST /auth/login).
+// Login handles POST /auth/login
+// @Summary Login Pengguna
+// @Description Authentikasi pengguna dan mengembalikan JWT token.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param login body services.AuthRequest true "Kredensial Login"
+// @Success 200 {object} map[string]string "Berhasil Login"
+// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
+// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req services.AuthRequest
 	if err := c.BodyParser(&req); err != nil {
