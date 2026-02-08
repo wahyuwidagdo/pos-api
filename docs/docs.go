@@ -25,7 +25,7 @@ const docTemplate = `{
     "paths": {
         "/auth/login": {
             "post": {
-                "description": "Authentikasi pengguna dan mengembalikan JWT token.",
+                "description": "Authenticate user and return JWT token for API access",
                 "consumes": [
                     "application/json"
                 ],
@@ -35,11 +35,11 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Login Pengguna",
+                "summary": "User Login",
                 "parameters": [
                     {
-                        "description": "Kredensial Login",
-                        "name": "login",
+                        "description": "User login credentials",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -49,30 +49,38 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Login",
+                        "description": "Login successful, returns JWT token",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "token": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid input format",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Invalid username or password",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -80,7 +88,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Authentikasi pengguna.",
+                "description": "Register a new user account for the POS system",
                 "consumes": [
                     "application/json"
                 ],
@@ -90,11 +98,11 @@ const docTemplate = `{
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Register Pengguna",
+                "summary": "Register New User",
                 "parameters": [
                     {
-                        "description": "Kredensial Register",
-                        "name": "register",
+                        "description": "User registration credentials",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -103,31 +111,34 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Berhasil Register",
+                    "201": {
+                        "description": "User registered successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.User"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid input or validation error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Kredensial Tidak Valid",
+                    "409": {
+                        "description": "Username already exists",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -135,7 +146,12 @@ const docTemplate = `{
         },
         "/categories": {
             "get": {
-                "description": "Mengambil semua daftar kategori.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a list of all product categories. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -145,50 +161,56 @@ const docTemplate = `{
                 "tags": [
                     "Categories"
                 ],
-                "summary": "Get All Kategori",
-                "parameters": [
-                    {
-                        "description": "Kredensial Category",
-                        "name": "category",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.CategoryRequest"
-                        }
-                    }
-                ],
+                "summary": "List All Categories",
                 "responses": {
                     "200": {
-                        "description": "Berhasil Get All Categories",
+                        "description": "List of categories",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validasi/Input Invalid",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.Category"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Membuat kategori baru.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new product category. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -198,11 +220,11 @@ const docTemplate = `{
                 "tags": [
                     "Categories"
                 ],
-                "summary": "Create Kategori",
+                "summary": "Create New Category",
                 "parameters": [
                     {
-                        "description": "Kredensial Category",
-                        "name": "category",
+                        "description": "Category data",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -211,39 +233,59 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Berhasil Create Category",
+                    "201": {
+                        "description": "Category created successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Category"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid input or validation error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Category name already exists",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/categories/:id": {
+        "/categories/{id}": {
             "get": {
-                "description": "Mengambil 1 kategori berdasarkan id.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a single category by its ID. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -253,50 +295,68 @@ const docTemplate = `{
                 "tags": [
                     "Categories"
                 ],
-                "summary": "Get Kategori",
+                "summary": "Get Category by ID",
                 "parameters": [
                     {
-                        "description": "Kredensial Category",
-                        "name": "category",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.CategoryRequest"
-                        }
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Get Category",
+                        "description": "Category found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Category"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid category ID",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             },
             "put": {
-                "description": "Update 1 kategori berdasarkan id.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update an existing category by its ID. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -306,11 +366,18 @@ const docTemplate = `{
                 "tags": [
                     "Categories"
                 ],
-                "summary": "Update Kategori",
+                "summary": "Update Category",
                 "parameters": [
                     {
-                        "description": "Kredensial Category",
-                        "name": "category",
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated category data",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -320,36 +387,62 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Create Category",
+                        "description": "Category updated successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Category"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid input or validation error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Category name conflicts with existing category",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             },
             "delete": {
-                "description": "Delete 1 kategori berdasarkan id.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete a category by its ID. Requires Admin or Manager role. Cannot delete if category is used by products.",
                 "consumes": [
                     "application/json"
                 ],
@@ -359,44 +452,51 @@ const docTemplate = `{
                 "tags": [
                     "Categories"
                 ],
-                "summary": "Delete Kategori",
+                "summary": "Delete Category",
                 "parameters": [
                     {
-                        "description": "Kredensial Category",
-                        "name": "category",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.CategoryRequest"
-                        }
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Delete Category",
+                        "description": "Category deleted successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.SuccessResponse"
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid category ID",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Category is used by products and cannot be deleted",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -404,7 +504,12 @@ const docTemplate = `{
         },
         "/products": {
             "get": {
-                "description": "Mengambil semua daftar produk.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a paginated list of all products. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -414,50 +519,72 @@ const docTemplate = `{
                 "tags": [
                     "Products"
                 ],
-                "summary": "Get All Produk",
+                "summary": "List All Products",
                 "parameters": [
                     {
-                        "description": "Kredensial Product",
-                        "name": "product",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.ProductRequest"
-                        }
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Number of items per page (default: 10)",
+                        "name": "pageSize",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Get All Product",
+                        "description": "List of products",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validasi/Input Invalid",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.PagedResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.Product"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Membuat produk baru.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new product in the inventory. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -467,11 +594,11 @@ const docTemplate = `{
                 "tags": [
                     "Products"
                 ],
-                "summary": "Create Produk",
+                "summary": "Create New Product",
                 "parameters": [
                     {
-                        "description": "Kredensial Product",
-                        "name": "product",
+                        "description": "Product data",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -480,39 +607,59 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Berhasil Create Product",
+                    "201": {
+                        "description": "Product created successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Product"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid input or validation error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Product SKU or name already exists",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/products/:id": {
+        "/products/{id}": {
             "get": {
-                "description": "Mengambil 1 produk berdasarkan id.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a single product by its ID. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -522,50 +669,68 @@ const docTemplate = `{
                 "tags": [
                     "Products"
                 ],
-                "summary": "Get Produk",
+                "summary": "Get Product by ID",
                 "parameters": [
                     {
-                        "description": "Kredensial Product",
-                        "name": "product",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.ProductRequest"
-                        }
+                        "type": "integer",
+                        "description": "Product ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Get Product",
+                        "description": "Product found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Product"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid product ID",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             },
             "put": {
-                "description": "Update 1 produk berdasarkan id.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update an existing product by its ID. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -575,11 +740,18 @@ const docTemplate = `{
                 "tags": [
                     "Products"
                 ],
-                "summary": "Update Produk",
+                "summary": "Update Product",
                 "parameters": [
                     {
-                        "description": "Kredensial Product",
-                        "name": "product",
+                        "type": "integer",
+                        "description": "Product ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated product data",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -589,36 +761,62 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Update Product",
+                        "description": "Product updated successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Product"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid input or validation error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Product SKU or name conflicts with existing product",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             },
             "delete": {
-                "description": "Menghapus 1 produk berdasarkan id.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete a product by its ID. Requires Admin or Manager role. Cannot delete if product is used in transactions.",
                 "consumes": [
                     "application/json"
                 ],
@@ -628,44 +826,51 @@ const docTemplate = `{
                 "tags": [
                     "Products"
                 ],
-                "summary": "Delete Produk",
+                "summary": "Delete Product",
                 "parameters": [
                     {
-                        "description": "Kredensial Product",
-                        "name": "product",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.ProductRequest"
-                        }
+                        "type": "integer",
+                        "description": "Product ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Get Product",
+                        "description": "Product deleted successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.SuccessResponse"
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid product ID",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Product is used in transactions and cannot be deleted",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -673,7 +878,12 @@ const docTemplate = `{
         },
         "/transactions": {
             "get": {
-                "description": "Mengambil semua daftar transaksi.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a list of all sales transactions. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -683,50 +893,56 @@ const docTemplate = `{
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Get All Transaksi",
-                "parameters": [
-                    {
-                        "description": "Kredensial Transaction",
-                        "name": "transaction",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.TransactionRequest"
-                        }
-                    }
-                ],
+                "summary": "List All Transactions",
                 "responses": {
                     "200": {
-                        "description": "Berhasil Get All Transaction",
+                        "description": "List of transactions",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validasi/Input Invalid",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.Transaction"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             },
             "post": {
-                "description": "Membuat transaksi baru.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Process a new sales transaction. Automatically deducts stock, calculates totals, and generates invoice code. Accessible by all authenticated roles (Admin, Manager, Cashier).",
                 "consumes": [
                     "application/json"
                 ],
@@ -736,11 +952,11 @@ const docTemplate = `{
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Create Transaksi",
+                "summary": "Create New Transaction (Sales)",
                 "parameters": [
                     {
-                        "description": "Kredensial Transaction",
-                        "name": "transaction",
+                        "description": "Transaction data with items",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -749,39 +965,65 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Berhasil Get Transaction",
+                    "201": {
+                        "description": "Transaction processed successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Transaction"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid input, insufficient stock, or insufficient payment",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/transactions/:id": {
+        "/transactions/{id}": {
             "get": {
-                "description": "Mengambil 1 transaksi berdasarkan id.",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a single transaction with its details. Requires Admin or Manager role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -791,44 +1033,63 @@ const docTemplate = `{
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Get Transaksi",
+                "summary": "Get Transaction by ID",
                 "parameters": [
                     {
-                        "description": "Kredensial Transaction",
-                        "name": "transaction",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/services.TransactionRequest"
-                        }
+                        "type": "integer",
+                        "description": "Transaction ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil Get Transaction",
+                        "description": "Transaction found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Transaction"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "400": {
-                        "description": "Validasi/Input Invalid",
+                        "description": "Invalid transaction ID",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Kredensial Tidak Valid",
+                        "description": "Authentication required",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Transaction not found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -836,6 +1097,167 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "models.Category": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Product": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "$ref": "#/definitions/models.Category"
+                },
+                "category_id": {
+                    "type": "integer"
+                },
+                "cost": {
+                    "description": "Harga Modal (penting untuk menghitung profit)",
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "description": "Harga Jual",
+                    "type": "number"
+                },
+                "sku": {
+                    "description": "Stock Keeping Unit (kode unik)",
+                    "type": "string"
+                },
+                "stock": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Transaction": {
+            "type": "object",
+            "properties": {
+                "cash": {
+                    "description": "Uang tunai yang dibayarkan pelanggan",
+                    "type": "number"
+                },
+                "change": {
+                    "description": "Uang kembalian",
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "discount": {
+                    "type": "number"
+                },
+                "grand_total": {
+                    "description": "Total akhir yang harus dibayar",
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "payment_method": {
+                    "description": "e.g., \"Cash\", \"QRIS\"",
+                    "type": "string"
+                },
+                "total_amount": {
+                    "description": "Total sebelum diskon/pajak",
+                    "type": "number"
+                },
+                "transaction_code": {
+                    "description": "Contoh: INV-20231016-0001",
+                    "type": "string"
+                },
+                "transaction_details": {
+                    "description": "Relasi ke detail",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TransactionDetail"
+                    }
+                }
+            }
+        },
+        "models.TransactionDetail": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "price_at_sale": {
+                    "description": "Harga jual saat transaksi terjadi",
+                    "type": "number"
+                },
+                "product": {
+                    "$ref": "#/definitions/models.Product"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "description": "Cache nama produk (jika produk diubah, histori transaksi tetap benar)",
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "subtotal": {
+                    "description": "Quantity * PriceAtSale",
+                    "type": "number"
+                },
+                "transaction_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.User": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "services.AuthRequest": {
             "type": "object",
             "required": [
@@ -946,6 +1368,45 @@ const docTemplate = `{
                 },
                 "payment_method": {
                     "description": "e.g., \"Cash\", \"QRIS\"",
+                    "type": "string"
+                }
+            }
+        },
+        "utils.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "utils.PagedResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "Array data (misal: []Product)"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "type": "integer"
+                }
+            }
+        },
+        "utils.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "Bisa berisi struct (item tunggal) atau string (token)"
+                },
+                "message": {
                     "type": "string"
                 }
             }

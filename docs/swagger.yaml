@@ -1,5 +1,116 @@
 basePath: /api/v1
 definitions:
+  models.Category:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.Product:
+    properties:
+      category:
+        $ref: '#/definitions/models.Category'
+      category_id:
+        type: integer
+      cost:
+        description: Harga Modal (penting untuk menghitung profit)
+        type: number
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      price:
+        description: Harga Jual
+        type: number
+      sku:
+        description: Stock Keeping Unit (kode unik)
+        type: string
+      stock:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  models.Transaction:
+    properties:
+      cash:
+        description: Uang tunai yang dibayarkan pelanggan
+        type: number
+      change:
+        description: Uang kembalian
+        type: number
+      created_at:
+        type: string
+      discount:
+        type: number
+      grand_total:
+        description: Total akhir yang harus dibayar
+        type: number
+      id:
+        type: integer
+      payment_method:
+        description: e.g., "Cash", "QRIS"
+        type: string
+      total_amount:
+        description: Total sebelum diskon/pajak
+        type: number
+      transaction_code:
+        description: 'Contoh: INV-20231016-0001'
+        type: string
+      transaction_details:
+        description: Relasi ke detail
+        items:
+          $ref: '#/definitions/models.TransactionDetail'
+        type: array
+    type: object
+  models.TransactionDetail:
+    properties:
+      id:
+        type: integer
+      price_at_sale:
+        description: Harga jual saat transaksi terjadi
+        type: number
+      product:
+        $ref: '#/definitions/models.Product'
+      product_id:
+        type: integer
+      product_name:
+        description: Cache nama produk (jika produk diubah, histori transaksi tetap
+          benar)
+        type: string
+      quantity:
+        type: integer
+      subtotal:
+        description: Quantity * PriceAtSale
+        type: number
+      transaction_id:
+        type: integer
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      role:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
   services.AuthRequest:
     properties:
       full_name:
@@ -81,6 +192,31 @@ definitions:
     - items
     - payment_method
     type: object
+  utils.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  utils.PagedResponse:
+    properties:
+      data:
+        description: 'Array data (misal: []Product)'
+      message:
+        type: string
+      page:
+        type: integer
+      pageSize:
+        type: integer
+    type: object
+  utils.SuccessResponse:
+    properties:
+      data:
+        description: Bisa berisi struct (item tunggal) atau string (token)
+      message:
+        type: string
+    type: object
 host: localhost:3000
 info:
   contact:
@@ -98,11 +234,11 @@ paths:
     post:
       consumes:
       - application/json
-      description: Authentikasi pengguna dan mengembalikan JWT token.
+      description: Authenticate user and return JWT token for API access
       parameters:
-      - description: Kredensial Login
+      - description: User login credentials
         in: body
-        name: login
+        name: request
         required: true
         schema:
           $ref: '#/definitions/services.AuthRequest'
@@ -110,212 +246,246 @@ paths:
       - application/json
       responses:
         "200":
-          description: Berhasil Login
+          description: Login successful, returns JWT token
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  properties:
+                    token:
+                      type: string
+                  type: object
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid input format
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Invalid username or password
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Login Pengguna
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: User Login
       tags:
       - Auth
   /auth/register:
     post:
       consumes:
       - application/json
-      description: Authentikasi pengguna.
+      description: Register a new user account for the POS system
       parameters:
-      - description: Kredensial Register
+      - description: User registration credentials
         in: body
-        name: register
+        name: request
         required: true
         schema:
           $ref: '#/definitions/services.AuthRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: Berhasil Register
+        "201":
+          description: User registered successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.User'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid input or validation error
           schema:
-            additionalProperties:
-              type: string
-            type: object
-        "401":
-          description: Kredensial Tidak Valid
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: Username already exists
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Register Pengguna
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Register New User
       tags:
       - Auth
   /categories:
     get:
       consumes:
       - application/json
-      description: Mengambil semua daftar kategori.
-      parameters:
-      - description: Kredensial Category
-        in: body
-        name: category
-        required: true
-        schema:
-          $ref: '#/definitions/services.CategoryRequest'
+      description: Retrieve a list of all product categories. Requires Admin or Manager
+        role.
       produces:
       - application/json
       responses:
         "200":
-          description: Berhasil Get All Categories
+          description: List of categories
           schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Validasi/Input Invalid
-          schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Category'
+                  type: array
+              type: object
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get All Kategori
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List All Categories
       tags:
       - Categories
     post:
       consumes:
       - application/json
-      description: Membuat kategori baru.
+      description: Create a new product category. Requires Admin or Manager role.
       parameters:
-      - description: Kredensial Category
+      - description: Category data
         in: body
-        name: category
+        name: request
         required: true
         schema:
           $ref: '#/definitions/services.CategoryRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: Berhasil Create Category
+        "201":
+          description: Category created successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Category'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid input or validation error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Create Kategori
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: Category name already exists
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create New Category
       tags:
       - Categories
-  /categories/:id:
+  /categories/{id}:
     delete:
       consumes:
       - application/json
-      description: Delete 1 kategori berdasarkan id.
+      description: Delete a category by its ID. Requires Admin or Manager role. Cannot
+        delete if category is used by products.
       parameters:
-      - description: Kredensial Category
-        in: body
-        name: category
+      - description: Category ID
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/services.CategoryRequest'
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Berhasil Delete Category
+          description: Category deleted successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.SuccessResponse'
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid category ID
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Delete Kategori
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: Category is used by products and cannot be deleted
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Category
       tags:
       - Categories
     get:
       consumes:
       - application/json
-      description: Mengambil 1 kategori berdasarkan id.
+      description: Retrieve a single category by its ID. Requires Admin or Manager
+        role.
       parameters:
-      - description: Kredensial Category
-        in: body
-        name: category
+      - description: Category ID
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/services.CategoryRequest'
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Berhasil Get Category
+          description: Category found
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Category'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid category ID
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get Kategori
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Category by ID
       tags:
       - Categories
     put:
       consumes:
       - application/json
-      description: Update 1 kategori berdasarkan id.
+      description: Update an existing category by its ID. Requires Admin or Manager
+        role.
       parameters:
-      - description: Kredensial Category
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated category data
         in: body
-        name: category
+        name: request
         required: true
         schema:
           $ref: '#/definitions/services.CategoryRequest'
@@ -323,176 +493,234 @@ paths:
       - application/json
       responses:
         "200":
-          description: Berhasil Create Category
+          description: Category updated successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Category'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid input or validation error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Update Kategori
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: Category name conflicts with existing category
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Category
       tags:
       - Categories
   /products:
     get:
       consumes:
       - application/json
-      description: Mengambil semua daftar produk.
+      description: Retrieve a paginated list of all products. Requires Admin or Manager
+        role.
       parameters:
-      - description: Kredensial Product
-        in: body
-        name: product
-        required: true
-        schema:
-          $ref: '#/definitions/services.ProductRequest'
+      - default: 1
+        description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 'Number of items per page (default: 10)'
+        in: query
+        name: pageSize
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Berhasil Get All Product
+          description: List of products
           schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Validasi/Input Invalid
-          schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.PagedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Product'
+                  type: array
+              type: object
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get All Produk
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List All Products
       tags:
       - Products
     post:
       consumes:
       - application/json
-      description: Membuat produk baru.
+      description: Create a new product in the inventory. Requires Admin or Manager
+        role.
       parameters:
-      - description: Kredensial Product
+      - description: Product data
         in: body
-        name: product
+        name: request
         required: true
         schema:
           $ref: '#/definitions/services.ProductRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: Berhasil Create Product
+        "201":
+          description: Product created successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Product'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid input or validation error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Create Produk
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: Product SKU or name already exists
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create New Product
       tags:
       - Products
-  /products/:id:
+  /products/{id}:
     delete:
       consumes:
       - application/json
-      description: Menghapus 1 produk berdasarkan id.
+      description: Delete a product by its ID. Requires Admin or Manager role. Cannot
+        delete if product is used in transactions.
       parameters:
-      - description: Kredensial Product
-        in: body
-        name: product
+      - description: Product ID
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/services.ProductRequest'
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Berhasil Get Product
+          description: Product deleted successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.SuccessResponse'
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid product ID
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Delete Produk
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Product not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: Product is used in transactions and cannot be deleted
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Product
       tags:
       - Products
     get:
       consumes:
       - application/json
-      description: Mengambil 1 produk berdasarkan id.
+      description: Retrieve a single product by its ID. Requires Admin or Manager
+        role.
       parameters:
-      - description: Kredensial Product
-        in: body
-        name: product
+      - description: Product ID
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/services.ProductRequest'
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Berhasil Get Product
+          description: Product found
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Product'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid product ID
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get Produk
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Product not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Product by ID
       tags:
       - Products
     put:
       consumes:
       - application/json
-      description: Update 1 produk berdasarkan id.
+      description: Update an existing product by its ID. Requires Admin or Manager
+        role.
       parameters:
-      - description: Kredensial Product
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated product data
         in: body
-        name: product
+        name: request
         required: true
         schema:
           $ref: '#/definitions/services.ProductRequest'
@@ -500,131 +728,173 @@ paths:
       - application/json
       responses:
         "200":
-          description: Berhasil Update Product
+          description: Product updated successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Product'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid input or validation error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Update Produk
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Product not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: Product SKU or name conflicts with existing product
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Product
       tags:
       - Products
   /transactions:
     get:
       consumes:
       - application/json
-      description: Mengambil semua daftar transaksi.
-      parameters:
-      - description: Kredensial Transaction
-        in: body
-        name: transaction
-        required: true
-        schema:
-          $ref: '#/definitions/services.TransactionRequest'
+      description: Retrieve a list of all sales transactions. Requires Admin or Manager
+        role.
       produces:
       - application/json
       responses:
         "200":
-          description: Berhasil Get All Transaction
+          description: List of transactions
           schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Validasi/Input Invalid
-          schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Transaction'
+                  type: array
+              type: object
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get All Transaksi
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List All Transactions
       tags:
       - Transactions
     post:
       consumes:
       - application/json
-      description: Membuat transaksi baru.
+      description: Process a new sales transaction. Automatically deducts stock, calculates
+        totals, and generates invoice code. Accessible by all authenticated roles
+        (Admin, Manager, Cashier).
       parameters:
-      - description: Kredensial Transaction
+      - description: Transaction data with items
         in: body
-        name: transaction
+        name: request
         required: true
         schema:
           $ref: '#/definitions/services.TransactionRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: Berhasil Get Transaction
+        "201":
+          description: Transaction processed successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Transaction'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid input, insufficient stock, or insufficient payment
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Create Transaksi
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Product not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create New Transaction (Sales)
       tags:
       - Transactions
-  /transactions/:id:
+  /transactions/{id}:
     get:
       consumes:
       - application/json
-      description: Mengambil 1 transaksi berdasarkan id.
+      description: Retrieve a single transaction with its details. Requires Admin
+        or Manager role.
       parameters:
-      - description: Kredensial Transaction
-        in: body
-        name: transaction
+      - description: Transaction ID
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/services.TransactionRequest'
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Berhasil Get Transaction
+          description: Transaction found
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Transaction'
+              type: object
         "400":
-          description: Validasi/Input Invalid
+          description: Invalid transaction ID
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
-          description: Kredensial Tidak Valid
+          description: Authentication required
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get Transaksi
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Transaction not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Transaction by ID
       tags:
       - Transactions
 securityDefinitions:
