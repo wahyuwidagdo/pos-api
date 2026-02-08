@@ -11,6 +11,7 @@ import (
 
 	_ "pos-api/docs"
 	"pos-api/internal/handlers"
+	"pos-api/internal/models"
 	"pos-api/internal/repositories"
 	"pos-api/internal/routes"
 	"pos-api/internal/services"
@@ -47,6 +48,9 @@ func main() {
 
 	// 2. Inisiasi koneksi Database (GORM & Migration)
 	database.ConnectDB()
+
+	// Auto-migrate Shift model
+	database.DB.AutoMigrate(&models.Shift{})
 
 	// 3. Inisiasi Fiber App
 	app := fiber.New()
@@ -86,6 +90,21 @@ func main() {
 	categoryService := services.NewCategoryService(categoryRepo)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
+	// --- DASHBOARD Module ---
+	dashboardRepo := repositories.NewDashboardRepository(database.DB)
+	dashboardService := services.NewDashboardService(dashboardRepo)
+	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
+
+	// --- REPORT Module ---
+	reportRepo := repositories.NewReportRepository(database.DB)
+	reportService := services.NewReportService(reportRepo)
+	reportHandler := handlers.NewReportHandler(reportService)
+
+	// --- SHIFT Module ---
+	shiftRepo := repositories.NewShiftRepository(database.DB)
+	shiftService := services.NewShiftService(shiftRepo)
+	shiftHandler := handlers.NewShiftHandler(shiftService)
+
 	// 5. Definisi Route
 	// Health Check
 	app.Get("/", func(c *fiber.Ctx) error {
@@ -105,8 +124,17 @@ func main() {
 
 	// Route Terproteksi (Perlu Token)
 	// Pass router group utama (apiV1) dan semua handlers yang dibutuhkan.
-	routes.ProtectedRoutes(apiV1, productHandler, transactionHandler, categoryHandler) // Group /api/v1/products
+	routes.ProtectedRoutes(
+		apiV1,
+		productHandler,
+		transactionHandler,
+		categoryHandler,
+		dashboardHandler,
+		reportHandler,
+		shiftHandler,
+	)
 
 	// 6. Jalankan Server
 	log.Fatal(app.Listen(":" + port))
 }
+

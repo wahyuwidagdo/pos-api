@@ -118,6 +118,40 @@ func (h *ProductHandler) ListProducts(c *fiber.Ctx) error {
 	return utils.JSONPaged(c, "Daftar produk berhasil dimuat", products, page, pageSize)
 }
 
+// GetLowStockProducts handles GET /products/low-stock
+// @Summary      Get Low Stock Products
+// @Description  Retrieve products with stock at or below the threshold. Useful for inventory alerts. Requires Admin or Manager role.
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        threshold query int false "Stock threshold (default: 10)" default(10)
+// @Success      200 {object} utils.SuccessResponse{data=[]models.Product} "Low stock products"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      500 {object} utils.ErrorResponse "Internal server error"
+// @Router       /products/low-stock [get]
+func (h *ProductHandler) GetLowStockProducts(c *fiber.Ctx) error {
+	threshold, err := strconv.Atoi(c.Query("threshold", "10"))
+	if err != nil || threshold <= 0 {
+		threshold = 10
+	}
+
+	products, err := h.service.GetLowStockProducts(threshold)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Gagal mengambil produk stok rendah: " + err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message":   "Daftar produk stok rendah berhasil dimuat",
+		"data":      products,
+		"threshold": threshold,
+		"count":     len(products),
+	})
+}
+
 // UpdateProduct handles PUT /products/{id}
 // @Summary      Update Product
 // @Description  Update an existing product by its ID. Requires Admin or Manager role.

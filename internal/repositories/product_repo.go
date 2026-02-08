@@ -11,6 +11,7 @@ type ProductRepository interface {
 	CreateProduct(product *models.Product) error
 	GetProductByID(id uint) (*models.Product, error)
 	GetAllProducts(limit, offset int) ([]models.Product, error)
+	GetLowStockProducts(threshold int) ([]models.Product, error)
 	UpdateProduct(product *models.Product) error
 	DeleteProduct(id uint) error
 }
@@ -51,8 +52,15 @@ func (r *productRepository) UpdateProduct(product *models.Product) error {
 	return result.Error
 }
 
+func (r *productRepository) GetLowStockProducts(threshold int) ([]models.Product, error) {
+	var products []models.Product
+	result := r.DB.Preload("Category").Where("stock <= ?", threshold).Order("stock ASC").Find(&products)
+	return products, result.Error
+}
+
 func (r *productRepository) DeleteProduct(id uint) error {
 	result := r.DB.Delete(&models.Product{}, id)
 	// gorm.ErrRecordNotFound akan dikembalikan jika tidak ada record yang dihapus
 	return result.Error
 }
+

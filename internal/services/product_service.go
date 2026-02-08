@@ -31,6 +31,7 @@ type ProductService interface {
 	CreateProduct(req ProductRequest) (*models.Product, error)
 	GetProduct(id uint) (*models.Product, error)
 	ListProducts(page, pageSize int) ([]models.Product, error)
+	GetLowStockProducts(threshold int) ([]models.Product, error)
 	UpdateProduct(id uint, req ProductRequest) (*models.Product, error)
 	DeleteProduct(id uint) error
 }
@@ -111,6 +112,13 @@ func (s *productService) ListProducts(page, pageSize int) ([]models.Product, err
 	}
 
 	return products, nil
+}
+
+func (s *productService) GetLowStockProducts(threshold int) ([]models.Product, error) {
+	if threshold <= 0 {
+		threshold = 10 // Default threshold
+	}
+	return s.repo.GetLowStockProducts(threshold)
 }
 
 func (s *productService) UpdateProduct(id uint, req ProductRequest) (*models.Product, error) {

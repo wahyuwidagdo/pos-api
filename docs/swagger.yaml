@@ -39,6 +39,43 @@ definitions:
       updated_at:
         type: string
     type: object
+  models.Shift:
+    properties:
+      cash_difference:
+        description: Selisih (bisa + atau -)
+        type: number
+      closed_at:
+        type: string
+      ending_cash:
+        description: Uang di laci saat tutup
+        type: number
+      expected_cash:
+        description: Yang seharusnya (hitung dari transaksi)
+        type: number
+      id:
+        type: integer
+      notes:
+        description: Catatan kasir
+        type: string
+      opened_at:
+        type: string
+      starting_cash:
+        description: Modal awal kasir
+        type: number
+      status:
+        description: open, closed
+        type: string
+      total_sales:
+        description: Total penjualan shift ini
+        type: number
+      total_transactions:
+        description: Jumlah transaksi
+        type: integer
+      user:
+        $ref: '#/definitions/models.User'
+      user_id:
+        type: integer
+    type: object
   models.Transaction:
     properties:
       cash:
@@ -111,6 +148,56 @@ definitions:
       username:
         type: string
     type: object
+  repositories.ProductReport:
+    properties:
+      category_name:
+        type: string
+      current_stock:
+        type: integer
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      total_revenue:
+        type: number
+      total_sold:
+        type: integer
+    type: object
+  repositories.SalesReport:
+    properties:
+      average_transaction:
+        type: number
+      date:
+        type: string
+      total_items_sold:
+        type: integer
+      total_sales:
+        type: number
+      total_transactions:
+        type: integer
+    type: object
+  repositories.SalesSummary:
+    properties:
+      average_per_day:
+        type: number
+      total_items_sold:
+        type: integer
+      total_sales:
+        type: number
+      total_transactions:
+        type: integer
+    type: object
+  repositories.TopProduct:
+    properties:
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      revenue:
+        type: number
+    type: object
   services.AuthRequest:
     properties:
       full_name:
@@ -133,6 +220,31 @@ definitions:
     required:
     - name
     type: object
+  services.CloseShiftRequest:
+    properties:
+      ending_cash:
+        minimum: 0
+        type: number
+      notes:
+        type: string
+    required:
+    - ending_cash
+    type: object
+  services.DashboardResponse:
+    properties:
+      low_stock_count:
+        type: integer
+      today_items_sold:
+        type: integer
+      today_sales:
+        type: number
+      today_transactions:
+        type: integer
+      top_products:
+        items:
+          $ref: '#/definitions/repositories.TopProduct'
+        type: array
+    type: object
   services.ItemRequest:
     properties:
       product_id:
@@ -142,6 +254,25 @@ definitions:
     required:
     - product_id
     - quantity
+    type: object
+  services.OpenShiftRequest:
+    properties:
+      starting_cash:
+        minimum: 0
+        type: number
+    required:
+    - starting_cash
+    type: object
+  services.ProductReportResponse:
+    properties:
+      end_date:
+        type: string
+      products:
+        items:
+          $ref: '#/definitions/repositories.ProductReport'
+        type: array
+      start_date:
+        type: string
     type: object
   services.ProductRequest:
     properties:
@@ -168,6 +299,19 @@ definitions:
     - name
     - price
     - stock
+    type: object
+  services.SalesReportResponse:
+    properties:
+      daily_data:
+        items:
+          $ref: '#/definitions/repositories.SalesReport'
+        type: array
+      end_date:
+        type: string
+      start_date:
+        type: string
+      summary:
+        $ref: '#/definitions/repositories.SalesSummary'
     type: object
   services.TransactionRequest:
     properties:
@@ -526,6 +670,42 @@ paths:
       summary: Update Category
       tags:
       - Categories
+  /dashboard:
+    get:
+      consumes:
+      - application/json
+      description: Get today's sales summary including total sales, transaction count,
+        items sold, low stock alerts, and top-selling products. Requires Admin or
+        Manager role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Dashboard data retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.DashboardResponse'
+              type: object
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Dashboard Statistics
+      tags:
+      - Dashboard
   /products:
     get:
       consumes:
@@ -761,6 +941,362 @@ paths:
       summary: Update Product
       tags:
       - Products
+  /products/low-stock:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve products with stock at or below the threshold. Useful
+        for inventory alerts. Requires Admin or Manager role.
+      parameters:
+      - default: 10
+        description: 'Stock threshold (default: 10)'
+        in: query
+        name: threshold
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Low stock products
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Product'
+                  type: array
+              type: object
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Low Stock Products
+      tags:
+      - Products
+  /reports/products:
+    get:
+      consumes:
+      - application/json
+      description: Get product sales performance for a date range, sorted by quantity
+        sold. Requires Admin or Manager role.
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        example: "2026-02-01"
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: End date (YYYY-MM-DD)
+        example: "2026-02-08"
+        in: query
+        name: end_date
+        required: true
+        type: string
+      - default: 20
+        description: 'Limit results (default: 20)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product report retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.ProductReportResponse'
+              type: object
+        "400":
+          description: Invalid date format or range
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Product Performance Report
+      tags:
+      - Reports
+  /reports/sales:
+    get:
+      consumes:
+      - application/json
+      description: Get sales report for a date range including daily breakdown and
+        summary. Requires Admin or Manager role.
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        example: "2026-02-01"
+        in: query
+        name: start_date
+        required: true
+        type: string
+      - description: End date (YYYY-MM-DD)
+        example: "2026-02-08"
+        in: query
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sales report retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/services.SalesReportResponse'
+              type: object
+        "400":
+          description: Invalid date format or range
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Sales Report
+      tags:
+      - Reports
+  /shifts:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of all shifts (open and closed). Requires
+        Admin or Manager role.
+      parameters:
+      - default: 1
+        description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 'Items per page (default: 10)'
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of shifts
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.PagedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Shift'
+                  type: array
+              type: object
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List All Shifts
+      tags:
+      - Shifts
+  /shifts/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get shift details by ID including reconciliation data. Requires
+        Admin or Manager role.
+      parameters:
+      - description: Shift ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Shift data
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Shift'
+              type: object
+        "400":
+          description: Invalid shift ID
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: Shift not found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Shift by ID
+      tags:
+      - Shifts
+  /shifts/close:
+    post:
+      consumes:
+      - application/json
+      description: Close the currently open shift with ending cash count. Calculates
+        expected vs actual cash and difference. Requires authentication.
+      parameters:
+      - description: Ending cash amount and notes
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.CloseShiftRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Shift closed successfully with reconciliation
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Shift'
+              type: object
+        "400":
+          description: Invalid input or no open shift
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Close Current Shift
+      tags:
+      - Shifts
+  /shifts/current:
+    get:
+      consumes:
+      - application/json
+      description: Get the currently open shift with real-time transaction summary.
+        Requires authentication.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Current shift data
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Shift'
+              type: object
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "404":
+          description: No open shift found
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Current Open Shift
+      tags:
+      - Shifts
+  /shifts/open:
+    post:
+      consumes:
+      - application/json
+      description: Open a new cashier shift with starting cash amount. Only one shift
+        can be open at a time. Requires authentication.
+      parameters:
+      - description: Starting cash amount
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/services.OpenShiftRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Shift opened successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Shift'
+              type: object
+        "400":
+          description: Invalid input or shift already open
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "409":
+          description: A shift is already open
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Open New Shift
+      tags:
+      - Shifts
   /transactions:
     get:
       consumes:
