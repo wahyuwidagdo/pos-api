@@ -6,6 +6,8 @@ import (
 
 	customErrors "pos-api/internal/pkg/errors" // Import custom errors
 
+	"pos-api/internal/pkg/utils"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -19,17 +21,20 @@ func NewProductHandler(s services.ProductService) *ProductHandler {
 	return &ProductHandler{service: s}
 }
 
-// Products handles POST /products
-// @Summary Create Produk
-// @Description Membuat produk baru.
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param product body services.ProductRequest true "Kredensial Product"
-// @Success 200 {object} map[string]string "Berhasil Create Product"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /products [post]
+// CreateProduct handles POST /products
+// @Summary      Create New Product
+// @Description  Create a new product in the inventory. Requires Admin or Manager role.
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        request body services.ProductRequest true "Product data"
+// @Success      201 {object} utils.SuccessResponse{data=models.Product} "Product created successfully"
+// @Failure      400 {object} utils.ErrorResponse "Invalid input or validation error"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      409 {object} utils.ErrorResponse "Product SKU or name already exists"
+// @Router       /products [post]
 func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 	var req services.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -44,23 +49,23 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Gagal membuat produk: " + err.Error()})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Produk berhasil dibuat",
-		"product": product,
-	})
+	return utils.JSONSuccess(c, fiber.StatusCreated, "Produk berhasil dibuat", product)
 }
 
-// Products handles GET /products/:id
-// @Summary Get Produk
-// @Description Mengambil 1 produk berdasarkan id.
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param product body services.ProductRequest true "Kredensial Product"
-// @Success 200 {object} map[string]string "Berhasil Get Product"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /products/:id [get]
+// GetProduct handles GET /products/{id}
+// @Summary      Get Product by ID
+// @Description  Retrieve a single product by its ID. Requires Admin or Manager role.
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "Product ID"
+// @Success      200 {object} utils.SuccessResponse{data=models.Product} "Product found"
+// @Failure      400 {object} utils.ErrorResponse "Invalid product ID"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      404 {object} utils.ErrorResponse "Product not found"
+// @Router       /products/{id} [get]
 func (h *ProductHandler) GetProduct(c *fiber.Ctx) error {
 	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
 	if err != nil {
@@ -75,22 +80,23 @@ func (h *ProductHandler) GetProduct(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil produk"})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"product": product,
-	})
+	return utils.JSONSuccess(c, fiber.StatusOK, "Detail produk ditemukan", product)
 }
 
-// Products handles GET /products
-// @Summary Get All Produk
-// @Description Mengambil semua daftar produk.
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param product body services.ProductRequest true "Kredensial Product"
-// @Success 200 {object} map[string]string "Berhasil Get All Product"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /products [get]
+// ListProducts handles GET /products
+// @Summary      List All Products
+// @Description  Retrieve a paginated list of all products. Requires Admin or Manager role.
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        page query int false "Page number (default: 1)" default(1)
+// @Param        pageSize query int false "Number of items per page (default: 10)" default(10)
+// @Success      200 {object} utils.PagedResponse{data=[]models.Product} "List of products"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      500 {object} utils.ErrorResponse "Internal server error"
+// @Router       /products [get]
 func (h *ProductHandler) ListProducts(c *fiber.Ctx) error {
 	// Ambil query parameter 'page' dan 'pageSize'
 	page, err := strconv.Atoi(c.Query("page", "1"))
@@ -109,24 +115,25 @@ func (h *ProductHandler) ListProducts(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil daftar produk: " + err.Error()})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"page":     page,
-		"pageSize": pageSize,
-		"products": products,
-	})
+	return utils.JSONPaged(c, "Daftar produk berhasil dimuat", products, page, pageSize)
 }
 
-// Products handles PUT /products/:id
-// @Summary Update Produk
-// @Description Update 1 produk berdasarkan id.
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param product body services.ProductRequest true "Kredensial Product"
-// @Success 200 {object} map[string]string "Berhasil Update Product"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /products/:id [put]
+// UpdateProduct handles PUT /products/{id}
+// @Summary      Update Product
+// @Description  Update an existing product by its ID. Requires Admin or Manager role.
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "Product ID"
+// @Param        request body services.ProductRequest true "Updated product data"
+// @Success      200 {object} utils.SuccessResponse{data=models.Product} "Product updated successfully"
+// @Failure      400 {object} utils.ErrorResponse "Invalid input or validation error"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      404 {object} utils.ErrorResponse "Product not found"
+// @Failure      409 {object} utils.ErrorResponse "Product SKU or name conflicts with existing product"
+// @Router       /products/{id} [put]
 func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 	// 1. Parse ID dari parameter
 	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
@@ -156,23 +163,24 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Gagal mengupdate produk: " + err.Error()})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Produk berhasil diupdate",
-		"product": updatedProduct,
-	})
+	return utils.JSONSuccess(c, fiber.StatusOK, "Produk berhasil diupdate", updatedProduct)
 }
 
-// Products handles DELETE /products/:id
-// @Summary Delete Produk
-// @Description Menghapus 1 produk berdasarkan id.
-// @Tags Products
-// @Accept json
-// @Produce json
-// @Param product body services.ProductRequest true "Kredensial Product"
-// @Success 200 {object} map[string]string "Berhasil Get Product"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /products/:id [delete]
+// DeleteProduct handles DELETE /products/{id}
+// @Summary      Delete Product
+// @Description  Delete a product by its ID. Requires Admin or Manager role. Cannot delete if product is used in transactions.
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "Product ID"
+// @Success      200 {object} utils.SuccessResponse "Product deleted successfully"
+// @Failure      400 {object} utils.ErrorResponse "Invalid product ID"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      404 {object} utils.ErrorResponse "Product not found"
+// @Failure      409 {object} utils.ErrorResponse "Product is used in transactions and cannot be deleted"
+// @Router       /products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	// 1. Parse ID dari parameter
 	id, err := strconv.ParseUint(c.Params("id"), 10, 32)

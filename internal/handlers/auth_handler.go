@@ -4,6 +4,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 
+	"pos-api/internal/pkg/utils"
 	"pos-api/internal/services"
 )
 
@@ -21,16 +22,16 @@ func NewAuthHandler(s services.AuthService) *AuthHandler {
 }
 
 // Register handles POST /auth/register
-// @Summary Register Pengguna
-// @Description Authentikasi pengguna.
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param register body services.AuthRequest true "Kredensial Register"
-// @Success 200 {object} map[string]string "Berhasil Register"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /auth/register [post]
+// @Summary      Register New User
+// @Description  Register a new user account for the POS system
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        request body services.AuthRequest true "User registration credentials"
+// @Success      201 {object} utils.SuccessResponse{data=models.User} "User registered successfully"
+// @Failure      400 {object} utils.ErrorResponse "Invalid input or validation error"
+// @Failure      409 {object} utils.ErrorResponse "Username already exists"
+// @Router       /auth/register [post]
 func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req services.AuthRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -61,23 +62,20 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Hindari mengembalikan password yang di-hash
 	user.Password = ""
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Pendaftaran berhasil",
-		"user":    user,
-	})
+	return utils.JSONSuccess(c, fiber.StatusCreated, "Pendaftaran berhasil", user)
 }
 
 // Login handles POST /auth/login
-// @Summary Login Pengguna
-// @Description Authentikasi pengguna dan mengembalikan JWT token.
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param login body services.AuthRequest true "Kredensial Login"
-// @Success 200 {object} map[string]string "Berhasil Login"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /auth/login [post]
+// @Summary      User Login
+// @Description  Authenticate user and return JWT token for API access
+// @Tags         Auth
+// @Accept       json
+// @Produce      json
+// @Param        request body services.AuthRequest true "User login credentials"
+// @Success      200 {object} utils.SuccessResponse{data=object{token=string}} "Login successful, returns JWT token"
+// @Failure      400 {object} utils.ErrorResponse "Invalid input format"
+// @Failure      401 {object} utils.ErrorResponse "Invalid username or password"
+// @Router       /auth/login [post]
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req services.AuthRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -90,8 +88,5 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Login berhasil",
-		"token":   token,
-	})
+	return utils.JSONSuccess(c, fiber.StatusOK, "Login berhasil", fiber.Map{"token": token})
 }

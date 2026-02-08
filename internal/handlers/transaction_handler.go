@@ -17,17 +17,21 @@ func NewTransactionHandler(s services.TransactionService) *TransactionHandler {
 	return &TransactionHandler{service: s}
 }
 
-// Transactions handles GET /transactions/:id
-// @Summary Get Transaksi
-// @Description Mengambil 1 transaksi berdasarkan id.
-// @Tags Transactions
-// @Accept json
-// @Produce json
-// @Param transaction body services.TransactionRequest true "Kredensial Transaction"
-// @Success 200 {object} map[string]string "Berhasil Get Transaction"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /transactions/:id [get]
+// GetTransaction handles GET /transactions/{id}
+// @Summary      Get Transaction by ID
+// @Description  Retrieve a single transaction with its details. Requires Admin or Manager role.
+// @Tags         Transactions
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "Transaction ID"
+// @Success      200 {object} utils.SuccessResponse{data=models.Transaction} "Transaction found"
+// @Failure      400 {object} utils.ErrorResponse "Invalid transaction ID"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      404 {object} utils.ErrorResponse "Transaction not found"
+// @Failure      500 {object} utils.ErrorResponse "Internal server error"
+// @Router       /transactions/{id} [get]
 func (h *TransactionHandler) GetTransaction(c *fiber.Ctx) error {
 	// 1. Ambil dan parse ID dari URL parameter
 	id, err := c.ParamsInt("id")
@@ -55,17 +59,18 @@ func (h *TransactionHandler) GetTransaction(c *fiber.Ctx) error {
 	})
 }
 
-// Transactions handles GET /transactions
-// @Summary Get All Transaksi
-// @Description Mengambil semua daftar transaksi.
-// @Tags Transactions
-// @Accept json
-// @Produce json
-// @Param transaction body services.TransactionRequest true "Kredensial Transaction"
-// @Success 200 {object} map[string]string "Berhasil Get All Transaction"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /transactions [get]
+// ListTransactions handles GET /transactions
+// @Summary      List All Transactions
+// @Description  Retrieve a list of all sales transactions. Requires Admin or Manager role.
+// @Tags         Transactions
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200 {object} utils.SuccessResponse{data=[]models.Transaction} "List of transactions"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      500 {object} utils.ErrorResponse "Internal server error"
+// @Router       /transactions [get]
 func (h *TransactionHandler) ListTransactions(c *fiber.Ctx) error {
 	// 1. Panggil Service Layer
 	transactions, err := h.service.ListTransactions()
@@ -82,17 +87,21 @@ func (h *TransactionHandler) ListTransactions(c *fiber.Ctx) error {
 	})
 }
 
-// Transactions handles POST /transactions
-// @Summary Create Transaksi
-// @Description Membuat transaksi baru.
-// @Tags Transactions
-// @Accept json
-// @Produce json
-// @Param transaction body services.TransactionRequest true "Kredensial Transaction"
-// @Success 200 {object} map[string]string "Berhasil Get Transaction"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /transactions [post]
+// CreateTransaction handles POST /transactions
+// @Summary      Create New Transaction (Sales)
+// @Description  Process a new sales transaction. Automatically deducts stock, calculates totals, and generates invoice code. Accessible by all authenticated roles (Admin, Manager, Cashier).
+// @Tags         Transactions
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        request body services.TransactionRequest true "Transaction data with items"
+// @Success      201 {object} utils.SuccessResponse{data=models.Transaction} "Transaction processed successfully"
+// @Failure      400 {object} utils.ErrorResponse "Invalid input, insufficient stock, or insufficient payment"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      404 {object} utils.ErrorResponse "Product not found"
+// @Failure      500 {object} utils.ErrorResponse "Internal server error"
+// @Router       /transactions [post]
 func (h *TransactionHandler) CreateTransaction(c *fiber.Ctx) error {
 	// 1. Inisiasi DTO dan Binding Request Body
 	var req services.TransactionRequest

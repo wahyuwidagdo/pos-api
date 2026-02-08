@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"pos-api/internal/pkg/utils"
 	"pos-api/internal/services"
 
 	"github.com/gofiber/fiber/v2"
@@ -16,17 +17,20 @@ func NewCategoryHandler(s services.CategoryService) *CategoryHandler {
 	return &CategoryHandler{service: s}
 }
 
-// Categories handles POST /categories
-// @Summary Create Kategori
-// @Description Membuat kategori baru.
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param category body services.CategoryRequest true "Kredensial Category"
-// @Success 200 {object} map[string]string "Berhasil Create Category"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /categories [post]
+// CreateCategory handles POST /categories
+// @Summary      Create New Category
+// @Description  Create a new product category. Requires Admin or Manager role.
+// @Tags         Categories
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        request body services.CategoryRequest true "Category data"
+// @Success      201 {object} utils.SuccessResponse{data=models.Category} "Category created successfully"
+// @Failure      400 {object} utils.ErrorResponse "Invalid input or validation error"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      409 {object} utils.ErrorResponse "Category name already exists"
+// @Router       /categories [post]
 func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 	var req services.CategoryRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -41,23 +45,23 @@ func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Gagal membuat kategori: " + err.Error()})
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Kategori berhasil dibuat",
-		"data":    category,
-	})
+	return utils.JSONSuccess(c, fiber.StatusCreated, "Kategori berhasil dibuat", category)
 }
 
-// Categories handles GET /categories/:id
-// @Summary Get Kategori
-// @Description Mengambil 1 kategori berdasarkan id.
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param category body services.CategoryRequest true "Kredensial Category"
-// @Success 200 {object} map[string]string "Berhasil Get Category"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /categories/:id [get]
+// GetCategory handles GET /categories/{id}
+// @Summary      Get Category by ID
+// @Description  Retrieve a single category by its ID. Requires Admin or Manager role.
+// @Tags         Categories
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "Category ID"
+// @Success      200 {object} utils.SuccessResponse{data=models.Category} "Category found"
+// @Failure      400 {object} utils.ErrorResponse "Invalid category ID"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      404 {object} utils.ErrorResponse "Category not found"
+// @Router       /categories/{id} [get]
 func (h *CategoryHandler) GetCategory(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
@@ -75,40 +79,43 @@ func (h *CategoryHandler) GetCategory(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"data": category})
 }
 
-// Categories handles GET /categories
-// @Summary Get All Kategori
-// @Description Mengambil semua daftar kategori.
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param category body services.CategoryRequest true "Kredensial Category"
-// @Success 200 {object} map[string]string "Berhasil Get All Categories"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /categories [get]
+// ListCategories handles GET /categories
+// @Summary      List All Categories
+// @Description  Retrieve a list of all product categories. Requires Admin or Manager role.
+// @Tags         Categories
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200 {object} utils.SuccessResponse{data=[]models.Category} "List of categories"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      500 {object} utils.ErrorResponse "Internal server error"
+// @Router       /categories [get]
 func (h *CategoryHandler) ListCategories(c *fiber.Ctx) error {
 	categories, err := h.service.ListCategories()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil daftar kategory"})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"message": "Daftar kategori berhasil dibuat",
-		"data":    categories,
-	})
+	return utils.JSONSuccess(c, fiber.StatusOK, "Daftar kategori berhasil dimuat", categories)
 }
 
-// Categories handles PUT /categories/:id
-// @Summary Update Kategori
-// @Description Update 1 kategori berdasarkan id.
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param category body services.CategoryRequest true "Kredensial Category"
-// @Success 200 {object} map[string]string "Berhasil Create Category"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /categories/:id [put]
+// UpdateCategory handles PUT /categories/{id}
+// @Summary      Update Category
+// @Description  Update an existing category by its ID. Requires Admin or Manager role.
+// @Tags         Categories
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "Category ID"
+// @Param        request body services.CategoryRequest true "Updated category data"
+// @Success      200 {object} utils.SuccessResponse{data=models.Category} "Category updated successfully"
+// @Failure      400 {object} utils.ErrorResponse "Invalid input or validation error"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      404 {object} utils.ErrorResponse "Category not found"
+// @Failure      409 {object} utils.ErrorResponse "Category name conflicts with existing category"
+// @Router       /categories/{id} [put]
 func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
@@ -138,17 +145,21 @@ func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 	})
 }
 
-// Categories handles DELETE /categories/:id
-// @Summary Delete Kategori
-// @Description Delete 1 kategori berdasarkan id.
-// @Tags Categories
-// @Accept json
-// @Produce json
-// @Param category body services.CategoryRequest true "Kredensial Category"
-// @Success 200 {object} map[string]string "Berhasil Delete Category"
-// @Failure 400 {object} map[string]string "Validasi/Input Invalid"
-// @Failure 401 {object} map[string]string "Kredensial Tidak Valid"
-// @Router /categories/:id [delete]
+// DeleteCategory handles DELETE /categories/{id}
+// @Summary      Delete Category
+// @Description  Delete a category by its ID. Requires Admin or Manager role. Cannot delete if category is used by products.
+// @Tags         Categories
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "Category ID"
+// @Success      200 {object} utils.SuccessResponse "Category deleted successfully"
+// @Failure      400 {object} utils.ErrorResponse "Invalid category ID"
+// @Failure      401 {object} utils.ErrorResponse "Authentication required"
+// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
+// @Failure      404 {object} utils.ErrorResponse "Category not found"
+// @Failure      409 {object} utils.ErrorResponse "Category is used by products and cannot be deleted"
+// @Router       /categories/{id} [delete]
 func (h *CategoryHandler) DeleteCategory(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
