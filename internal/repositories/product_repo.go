@@ -10,7 +10,7 @@ import (
 type ProductRepository interface {
 	CreateProduct(product *models.Product) error
 	GetProductByID(id uint) (*models.Product, error)
-	GetAllProducts(limit, offset int) ([]models.Product, error)
+	GetAllProducts(limit, offset int, search string) ([]models.Product, error)
 	GetLowStockProducts(threshold int) ([]models.Product, error)
 	UpdateProduct(product *models.Product) error
 	DeleteProduct(id uint) error
@@ -39,10 +39,16 @@ func (r *productRepository) GetProductByID(id uint) (*models.Product, error) {
 	return &product, result.Error
 }
 
-func (r *productRepository) GetAllProducts(limit, offset int) ([]models.Product, error) {
+func (r *productRepository) GetAllProducts(limit, offset int, search string) ([]models.Product, error) {
 	var products []models.Product
-	// Preload Category dan terapkan Pagination
-	result := r.DB.Limit(limit).Offset(offset).Preload("Category").Find(&products)
+	query := r.DB.Limit(limit).Offset(offset).Preload("Category")
+
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		query = query.Where("name ILIKE ? OR sku ILIKE ?", searchTerm, searchTerm)
+	}
+
+	result := query.Find(&products)
 	return products, result.Error
 }
 

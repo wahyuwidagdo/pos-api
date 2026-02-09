@@ -30,7 +30,7 @@ type ProductRequest struct {
 type ProductService interface {
 	CreateProduct(req ProductRequest) (*models.Product, error)
 	GetProduct(id uint) (*models.Product, error)
-	ListProducts(page, pageSize int) ([]models.Product, error)
+	ListProducts(page, pageSize int, search string) ([]models.Product, error)
 	GetLowStockProducts(threshold int) ([]models.Product, error)
 	UpdateProduct(id uint, req ProductRequest) (*models.Product, error)
 	DeleteProduct(id uint) error
@@ -96,7 +96,7 @@ func (s *productService) GetProduct(id uint) (*models.Product, error) {
 	return product, nil
 }
 
-func (s *productService) ListProducts(page, pageSize int) ([]models.Product, error) {
+func (s *productService) ListProducts(page, pageSize int, search string) ([]models.Product, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -106,7 +106,7 @@ func (s *productService) ListProducts(page, pageSize int) ([]models.Product, err
 
 	offset := (page - 1) * pageSize
 
-	products, err := s.repo.GetAllProducts(pageSize, offset)
+	products, err := s.repo.GetAllProducts(pageSize, offset, search)
 	if err != nil {
 		return nil, errors.New("gagal mengambil produk")
 	}

@@ -109,7 +109,9 @@ func (h *ProductHandler) ListProducts(c *fiber.Ctx) error {
 		pageSize = 10
 	}
 
-	products, err := h.service.ListProducts(page, pageSize)
+	search := c.Query("search", "")
+
+	products, err := h.service.ListProducts(page, pageSize, search)
 	if err != nil {
 		// Asumsikan error adalah masalah internal/database
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil daftar produk: " + err.Error()})
