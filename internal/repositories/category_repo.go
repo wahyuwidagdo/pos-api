@@ -37,8 +37,31 @@ func (r *categoryRepository) GetCategoryByID(id uint) (*models.Category, error) 
 
 func (r *categoryRepository) GetAllCategories() ([]models.Category, error) {
 	var categories []models.Category
-	result := r.DB.Find(&categories)
-	return categories, result.Error
+	if err := r.DB.Find(&categories).Error; err != nil {
+		return nil, err
+	}
+
+	// Manually populate product_count since gorm:"-" prevents scanning subqueries
+	type countResult struct {
+		CategoryID   uint  `gorm:"column:category_id"`
+		ProductCount int64 `gorm:"column:product_count"`
+	}
+	var counts []countResult
+	r.DB.Model(&models.Product{}).
+		Select("category_id, COUNT(*) as product_count").
+		Group("category_id").
+		Find(&counts)
+
+	countMap := make(map[uint]int64)
+	for _, c := range counts {
+		countMap[c.CategoryID] = c.ProductCount
+	}
+
+	for i := range categories {
+		categories[i].ProductCount = countMap[categories[i].ID]
+	}
+
+	return categories, nil
 }
 
 func (r *categoryRepository) UpdateCategory(category *models.Category) error {

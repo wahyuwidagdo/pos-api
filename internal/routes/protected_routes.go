@@ -47,6 +47,7 @@ func ProtectedRoutes(
 	productGroup := router.Group("/products", jwtMiddleware, allRoles)
 	productGroup.Get("/", productHandler.ListProducts)
 	productGroup.Get("/low-stock", productHandler.GetLowStockProducts) // GET /api/v1/products/low-stock
+	productGroup.Get("/stock-counts", productHandler.GetStockCounts)   // GET /api/v1/products/stock-counts
 	productGroup.Get("/:id", productHandler.GetProduct)
 
 	// WRITE: Only Admin/Manager can create, update, delete products

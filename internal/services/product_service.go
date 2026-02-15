@@ -30,8 +30,9 @@ type ProductRequest struct {
 type ProductService interface {
 	CreateProduct(req ProductRequest) (*models.Product, error)
 	GetProduct(id uint) (*models.Product, error)
-	ListProducts(page, pageSize int, search string) ([]models.Product, error)
+	ListProducts(page, pageSize int, search string, stockFilter string, sortBy string, sortOrder string) ([]models.Product, int64, error)
 	GetLowStockProducts(threshold int) ([]models.Product, error)
+	GetStockCounts() (map[string]int64, error)
 	UpdateProduct(id uint, req ProductRequest) (*models.Product, error)
 	DeleteProduct(id uint) error
 }
@@ -96,7 +97,7 @@ func (s *productService) GetProduct(id uint) (*models.Product, error) {
 	return product, nil
 }
 
-func (s *productService) ListProducts(page, pageSize int, search string) ([]models.Product, error) {
+func (s *productService) ListProducts(page, pageSize int, search string, stockFilter string, sortBy string, sortOrder string) ([]models.Product, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -106,12 +107,12 @@ func (s *productService) ListProducts(page, pageSize int, search string) ([]mode
 
 	offset := (page - 1) * pageSize
 
-	products, err := s.repo.GetAllProducts(pageSize, offset, search)
+	products, count, err := s.repo.GetAllProducts(pageSize, offset, search, stockFilter, sortBy, sortOrder)
 	if err != nil {
-		return nil, errors.New("gagal mengambil produk")
+		return nil, 0, errors.New("gagal mengambil produk")
 	}
 
-	return products, nil
+	return products, count, nil
 }
 
 func (s *productService) GetLowStockProducts(threshold int) ([]models.Product, error) {
@@ -184,4 +185,8 @@ func (s *productService) DeleteProduct(id uint) error {
 	}
 
 	return nil
+}
+
+func (s *productService) GetStockCounts() (map[string]int64, error) {
+	return s.repo.GetStockCounts()
 }

@@ -11,11 +11,12 @@ type SuccessResponse struct {
 
 // PagedResponse mendefinisikan format response untuk daftar data (array) dengan informasi pagination.
 type PagedResponse struct {
-	Message  string      `json:"message"`
-	Data     interface{} `json:"data,omitempty"` // Array data (misal: []Product)
-	Page     int         `json:"page,omitempty"`
-	PageSize int         `json:"pageSize,omitempty"`
-	// Total    int         `json:"total,omitempty"`
+	Message    string      `json:"message"`
+	Data       interface{} `json:"data,omitempty"` // Array data (misal: []Product)
+	Page       int         `json:"page,omitempty"`
+	PageSize   int         `json:"pageSize,omitempty"`
+	TotalItems int64       `json:"total_items"`
+	TotalPage  int         `json:"total_page"`
 }
 
 // ErrorResponse mendefinisikan format response untuk kesalahan.
@@ -35,13 +36,19 @@ func JSONSuccess(c *fiber.Ctx, statusCode int, message string, data interface{})
 }
 
 // JSONPaged digunakan untuk daftar data (List).
-func JSONPaged(c *fiber.Ctx, message string, data interface{}, page, pageSize int) error {
+func JSONPaged(c *fiber.Ctx, message string, data interface{}, page, pageSize int, totalItems int64) error {
+	totalPage := int(totalItems) / pageSize
+	if int(totalItems)%pageSize != 0 {
+		totalPage++
+	}
+
 	return c.Status(fiber.StatusOK).JSON(PagedResponse{
-		Message:  message,
-		Data:     data,
-		Page:     page,
-		PageSize: pageSize,
-		// Total:    total,
+		Message:    message,
+		Data:       data,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalItems: totalItems,
+		TotalPage:  totalPage,
 	})
 }
 

@@ -110,14 +110,17 @@ func (h *ProductHandler) ListProducts(c *fiber.Ctx) error {
 	}
 
 	search := c.Query("search", "")
+	stockFilter := c.Query("stockFilter", "")
+	sortBy := c.Query("sortBy", "")
+	sortOrder := c.Query("sortOrder", "")
 
-	products, err := h.service.ListProducts(page, pageSize, search)
+	products, count, err := h.service.ListProducts(page, pageSize, search, stockFilter, sortBy, sortOrder)
 	if err != nil {
 		// Asumsikan error adalah masalah internal/database
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil daftar produk: " + err.Error()})
 	}
 
-	return utils.JSONPaged(c, "Daftar produk berhasil dimuat", products, page, pageSize)
+	return utils.JSONPaged(c, "Daftar produk berhasil dimuat", products, page, pageSize, count)
 }
 
 // GetLowStockProducts handles GET /products/low-stock
@@ -240,4 +243,13 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Produk berhasil dihapus",
 	})
+}
+
+// GetStockCounts handles GET /products/stock-counts
+func (h *ProductHandler) GetStockCounts(c *fiber.Ctx) error {
+	counts, err := h.service.GetStockCounts()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"data": counts})
 }
