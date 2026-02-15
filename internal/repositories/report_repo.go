@@ -8,10 +8,10 @@ import (
 
 // SalesReport represents a sales report entry
 type SalesReport struct {
-	Date              string  `json:"date"`
-	TotalSales        float64 `json:"total_sales"`
-	TotalTransactions int64   `json:"total_transactions"`
-	TotalItemsSold    int64   `json:"total_items_sold"`
+	Date               string  `json:"date"`
+	TotalSales         float64 `json:"total_sales"`
+	TotalTransactions  int64   `json:"total_transactions"`
+	TotalItemsSold     int64   `json:"total_items_sold"`
 	AverageTransaction float64 `json:"average_transaction"`
 }
 
@@ -25,11 +25,28 @@ type ProductReport struct {
 	CurrentStock int     `json:"current_stock"`
 }
 
+// HourlySales represents sales grouped by hour
+type HourlySales struct {
+	Hour              int     `json:"hour"`
+	TotalSales        float64 `json:"total_sales"`
+	TotalTransactions int64   `json:"total_transactions"`
+}
+
+// StockValue represents the total inventory value
+type StockValue struct {
+	TotalProducts int64   `json:"total_products"`
+	TotalUnits    int64   `json:"total_units"`
+	TotalValue    float64 `json:"total_value"`  // SUM(stock * cost)
+	TotalRetail   float64 `json:"total_retail"` // SUM(stock * price)
+}
+
 // ReportRepository defines the contract for report data access
 type ReportRepository interface {
 	GetSalesReport(startDate, endDate time.Time) ([]SalesReport, error)
 	GetProductReport(startDate, endDate time.Time, limit int) ([]ProductReport, error)
 	GetSalesSummary(startDate, endDate time.Time) (*SalesSummary, error)
+	GetSalesByHour(startDate, endDate time.Time) ([]HourlySales, error)
+	GetStockValue() (*StockValue, error)
 }
 
 // SalesSummary represents the summary of sales for a period
@@ -38,6 +55,8 @@ type SalesSummary struct {
 	TotalTransactions int64   `json:"total_transactions"`
 	TotalItemsSold    int64   `json:"total_items_sold"`
 	AveragePerDay     float64 `json:"average_per_day"`
+	GrossProfit       float64 `json:"gross_profit"`
+	ProfitMargin      float64 `json:"profit_margin"` // percentage
 }
 
 type reportRepository struct {
@@ -138,6 +157,18 @@ func (r *reportRepository) GetSalesSummary(startDate, endDate time.Time) (*Sales
 		Scan(&itemsSold)
 	summary.TotalItemsSold = itemsSold
 
+	// Get gross profit (revenue - cost)
+	var totalCost float64
+	r.db.Table("transaction_details").
+		Joins("JOIN transactions ON transactions.id = transaction_details.transaction_id").
+		Where("transactions.created_at >= ? AND transactions.created_at < ?", startDate, endDate.Add(24*time.Hour)).
+		Select("COALESCE(SUM(transaction_details.cost_at_sale * transaction_details.quantity), 0)").
+		Scan(&totalCost)
+	summary.GrossProfit = summary.TotalSales - totalCost
+	if summary.TotalSales > 0 {
+		summary.ProfitMargin = (summary.GrossProfit / summary.TotalSales) * 100
+	}
+
 	// Calculate days in range
 	days := endDate.Sub(startDate).Hours() / 24
 	if days > 0 {
@@ -145,4 +176,44 @@ func (r *reportRepository) GetSalesSummary(startDate, endDate time.Time) (*Sales
 	}
 
 	return &summary, nil
+}
+
+// GetSalesByHour retrieves sales grouped by hour of day
+func (r *reportRepository) GetSalesByHour(startDate, endDate time.Time) ([]HourlySales, error) {
+	var hourly []HourlySales
+
+	err := r.db.Table("transactions").
+		Select(`
+			EXTRACT(HOUR FROM created_at)::int as hour,
+			COALESCE(SUM(grand_total), 0) as total_sales,
+			COUNT(*) as total_transactions
+		`).
+		Where("created_at >= ? AND created_at < ?", startDate, endDate.Add(24*time.Hour)).
+		Group("EXTRACT(HOUR FROM created_at)").
+		Order("hour ASC").
+		Scan(&hourly).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return hourly, nil
+}
+
+// GetStockValue calculates the total inventory value
+func (r *reportRepository) GetStockValue() (*StockValue, error) {
+	var sv StockValue
+
+	err := r.db.Table("products").
+		Select(`
+			COUNT(*) as total_products,
+			COALESCE(SUM(stock), 0) as total_units,
+			COALESCE(SUM(stock * cost), 0) as total_value,
+			COALESCE(SUM(stock * price), 0) as total_retail
+		`).
+		Scan(&sv).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &sv, nil
 }

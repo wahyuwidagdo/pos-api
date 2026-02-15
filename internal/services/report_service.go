@@ -15,10 +15,11 @@ type SalesReportRequest struct {
 
 // SalesReportResponse represents the complete sales report
 type SalesReportResponse struct {
-	Summary    *repositories.SalesSummary   `json:"summary"`
-	DailyData  []repositories.SalesReport   `json:"daily_data"`
-	StartDate  string                       `json:"start_date"`
-	EndDate    string                       `json:"end_date"`
+	Summary    *repositories.SalesSummary `json:"summary"`
+	DailyData  []repositories.SalesReport `json:"daily_data"`
+	HourlyData []repositories.HourlySales `json:"hourly_data"`
+	StartDate  string                     `json:"start_date"`
+	EndDate    string                     `json:"end_date"`
 }
 
 // ProductReportResponse represents the product performance report
@@ -32,6 +33,7 @@ type ProductReportResponse struct {
 type ReportService interface {
 	GetSalesReport(startDate, endDate string) (*SalesReportResponse, error)
 	GetProductReport(startDate, endDate string, limit int) (*ProductReportResponse, error)
+	GetStockValue() (*repositories.StockValue, error)
 }
 
 type reportService struct {
@@ -71,11 +73,18 @@ func (s *reportService) GetSalesReport(startDateStr, endDateStr string) (*SalesR
 		return nil, errors.New("gagal mengambil data penjualan harian")
 	}
 
+	// Get hourly data
+	hourlyData, err := s.repo.GetSalesByHour(startDate, endDate)
+	if err != nil {
+		hourlyData = []repositories.HourlySales{} // non-critical, fallback
+	}
+
 	return &SalesReportResponse{
-		Summary:   summary,
-		DailyData: dailyData,
-		StartDate: startDateStr,
-		EndDate:   endDateStr,
+		Summary:    summary,
+		DailyData:  dailyData,
+		HourlyData: hourlyData,
+		StartDate:  startDateStr,
+		EndDate:    endDateStr,
 	}, nil
 }
 
@@ -110,4 +119,9 @@ func (s *reportService) GetProductReport(startDateStr, endDateStr string, limit 
 		StartDate: startDateStr,
 		EndDate:   endDateStr,
 	}, nil
+}
+
+// GetStockValue retrieves the current stock value
+func (s *reportService) GetStockValue() (*repositories.StockValue, error) {
+	return s.repo.GetStockValue()
 }

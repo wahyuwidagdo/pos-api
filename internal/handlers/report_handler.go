@@ -100,3 +100,18 @@ func (h *ReportHandler) GetProductReport(c *fiber.Ctx) error {
 		"data":    report,
 	})
 }
+
+// GetStockValue handles GET /reports/stock-value
+func (h *ReportHandler) GetStockValue(c *fiber.Ctx) error {
+	stockValue, err := h.service.GetStockValue()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Gagal mengambil nilai stok",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Nilai stok berhasil dimuat",
+		"data":    stockValue,
+	})
+}

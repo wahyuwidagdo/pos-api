@@ -46,26 +46,30 @@ func main() {
 	}
 	port := os.Getenv("PORT")
 
+	// Validate JWT secret length
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if len(jwtSecret) < 32 {
+		log.Println("⚠️  WARNING: JWT_SECRET is shorter than 32 characters. Use a longer secret for production!")
+	}
+
 	// 2. Inisiasi koneksi Database (GORM & Migration)
 	database.ConnectDB()
 
-	// Auto-migrate Shift model
-	database.DB.AutoMigrate(&models.Shift{})
+	// Auto-migrate new/modified models
+	database.DB.AutoMigrate(&models.StoreSetting{}, &models.TransactionDetail{})
 
 	// 3. Inisiasi Fiber App
 	app := fiber.New()
 	app.Use(logger.New())
 
-	// Terapkan CORS Middleware <-- HARUS ADA DI SINI
+	// CORS Middleware — read allowed origins from env
+	corsOrigins := os.Getenv("CORS_ORIGINS")
+	if corsOrigins == "" {
+		corsOrigins = "http://localhost:5173,http://localhost:5174"
+	}
 	app.Use(cors.New(cors.Config{
-		// Izinkan request hanya dari domain/port frontend Anda (misalnya 5173 atau 3001)
-		// Ganti 'http://localhost:5173' dengan port tempat React Anda berjalan
-		AllowOrigins: "http://localhost:5173, http://127.0.0.1:5173",
-
-		// Izinkan metode HTTP yang dibutuhkan
+		AllowOrigins: corsOrigins,
 		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
-
-		// Izinkan Header Kritis (termasuk Authorization untuk JWT)
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
@@ -100,10 +104,10 @@ func main() {
 	reportService := services.NewReportService(reportRepo)
 	reportHandler := handlers.NewReportHandler(reportService)
 
-	// --- SHIFT Module ---
-	shiftRepo := repositories.NewShiftRepository(database.DB)
-	shiftService := services.NewShiftService(shiftRepo)
-	shiftHandler := handlers.NewShiftHandler(shiftService)
+	// --- STORE SETTINGS Module ---
+	storeSettingRepo := repositories.NewStoreSettingRepository(database.DB)
+	storeSettingService := services.NewStoreSettingService(storeSettingRepo)
+	storeSettingHandler := handlers.NewStoreSettingHandler(storeSettingService)
 
 	// 5. Definisi Route
 	// Health Check
@@ -131,10 +135,10 @@ func main() {
 		categoryHandler,
 		dashboardHandler,
 		reportHandler,
-		shiftHandler,
+		authHandler,
+		storeSettingHandler,
 	)
 
 	// 6. Jalankan Server
 	log.Fatal(app.Listen(":" + port))
 }
-

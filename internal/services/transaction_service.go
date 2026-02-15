@@ -109,6 +109,7 @@ func (s *transactionService) ProcessTransaction(req TransactionRequest) (*models
 			ProductName: product.Name, // Simpan cache nama
 			Quantity:    itemReq.Quantity,
 			PriceAtSale: priceAtSale,
+			CostAtSale:  product.Cost, // Simpan harga beli untuk kalkulasi laba
 			SubTotal:    subTotal,
 		})
 

@@ -38,12 +38,8 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input JSON tidak valid"})
 	}
 
-	// --- LOGIKA VALIDASI BARU ---
 	if err := validate.Struct(req); err != nil {
-		// Logika untuk menampilkan error validasi spesifik
 		validationErrors := err.(validator.ValidationErrors)
-
-		// Cek apakah ada error required
 		for _, fieldErr := range validationErrors {
 			if fieldErr.Tag() == "required" {
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fieldErr.Field() + " harus diisi"})
@@ -51,15 +47,12 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Validasi gagal: " + err.Error()})
 	}
-	// --- AKHIR LOGIKA VALIDASI BARU ---
 
-	// Panggil Service Layer
 	user, err := h.service.Register(req)
 	if err != nil {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Hindari mengembalikan password yang di-hash
 	user.Password = ""
 
 	return utils.JSONSuccess(c, fiber.StatusCreated, "Pendaftaran berhasil", user)
@@ -82,11 +75,84 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input tidak valid"})
 	}
 
-	// Panggil Service Layer untuk login dan mendapatkan token
-	token, err := h.service.Login(req)
+	token, user, err := h.service.Login(req)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return utils.JSONSuccess(c, fiber.StatusOK, "Login berhasil", fiber.Map{"token": token})
+	// Return both token and user info
+	return utils.JSONSuccess(c, fiber.StatusOK, "Login berhasil", fiber.Map{
+		"token": token,
+		"user": fiber.Map{
+			"id":        user.ID,
+			"username":  user.Username,
+			"full_name": user.FullName,
+			"role":      user.Role,
+			"is_active": user.IsActive,
+		},
+	})
+}
+
+// GetProfile handles GET /auth/profile
+func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {
+	userIDFloat, ok := c.Locals("userID").(float64)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "User ID not found"})
+	}
+	userID := uint(userIDFloat)
+
+	user, err := h.service.GetProfile(userID)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	user.Password = ""
+	return utils.JSONSuccess(c, fiber.StatusOK, "Profile retrieved", user)
+}
+
+// UpdateProfile handles PUT /auth/profile
+func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
+	userIDFloat, ok := c.Locals("userID").(float64)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "User ID not found"})
+	}
+	userID := uint(userIDFloat)
+
+	var req services.UpdateProfileRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input tidak valid"})
+	}
+
+	user, err := h.service.UpdateProfile(userID, req)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	user.Password = ""
+	return utils.JSONSuccess(c, fiber.StatusOK, "Profile updated", user)
+}
+
+// ChangePassword handles PUT /auth/password
+func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
+	userIDFloat, ok := c.Locals("userID").(float64)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "User ID not found"})
+	}
+	userID := uint(userIDFloat)
+
+	var req services.ChangePasswordRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input tidak valid"})
+	}
+
+	if err := validate.Struct(req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Password fields are required"})
+	}
+
+	err := h.service.ChangePassword(userID, req)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return utils.JSONSuccess(c, fiber.StatusOK, "Password updated successfully", nil)
 }
