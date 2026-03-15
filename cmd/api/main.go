@@ -2,16 +2,18 @@ package main
 
 import (
 	"log"
-	"os"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/joho/godotenv"
 
 	_ "pos-api/docs"
+	"pos-api/internal/config"
 	"pos-api/internal/handlers"
-	"pos-api/internal/models"
+	"pos-api/internal/listeners"
+	appLogger "pos-api/internal/logger"
+	"pos-api/internal/pkg/events"
 	"pos-api/internal/repositories"
 	"pos-api/internal/routes"
 	"pos-api/internal/services"
@@ -39,36 +41,30 @@ import (
 // @name Authorization
 
 func main() {
-	// 1. Muat variable lingkungan
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	port := os.Getenv("PORT")
+	// 1. Muat konfigurasi
+	cfg := config.LoadConfig()
+
+	// Initialize Logger
+	appLogger.InitLogger(cfg.Environment)
 
 	// Validate JWT secret length
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if len(jwtSecret) < 32 {
-		log.Println("⚠️  WARNING: JWT_SECRET is shorter than 32 characters. Use a longer secret for production!")
+	if len(cfg.JWTSecret) < 32 {
+		slog.Warn("JWT_SECRET is shorter than 32 characters. Use a longer secret for production!")
 	}
 
 	// 2. Inisiasi koneksi Database (GORM & Migration)
-	database.ConnectDB()
+	database.ConnectDB(cfg)
 
-	// Auto-migrate new/modified models
-	database.DB.AutoMigrate(&models.StoreSetting{}, &models.TransactionDetail{})
+	// Run Database Migrations (golang-migrate)
+	database.RunMigrations(database.DB)
 
 	// 3. Inisiasi Fiber App
 	app := fiber.New()
 	app.Use(logger.New())
 
-	// CORS Middleware — read allowed origins from env
-	corsOrigins := os.Getenv("CORS_ORIGINS")
-	if corsOrigins == "" {
-		corsOrigins = "http://localhost:5173,http://localhost:5174"
-	}
+	// CORS Middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: corsOrigins,
+		AllowOrigins: cfg.CORSOrigins,
 		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
@@ -84,8 +80,21 @@ func main() {
 	productService := services.NewProductService(productRepo)
 	productHandler := handlers.NewProductHandler(productService)
 
+	// --- INITIALIZE EVENT BUS ---
+	eventBus := events.NewMemoryEventBus()
+	eventBus.Subscribe(events.EventTransactionCreated, listeners.HandleCashFlowOnTransaction)
+	eventBus.Subscribe(events.EventTransactionCreated, listeners.HandleInventoryOnTransaction)
+
+	eventBus.Subscribe(events.EventTransactionReturned, listeners.HandleCashFlowOnTransactionReverted)
+	eventBus.Subscribe(events.EventTransactionReturned, listeners.HandleInventoryOnTransactionReverted)
+
+	eventBus.Subscribe(events.EventTransactionCancelled, listeners.HandleCashFlowOnTransactionReverted)
+	eventBus.Subscribe(events.EventTransactionCancelled, listeners.HandleInventoryOnTransactionReverted)
+
+	eventBus.Subscribe(events.EventInventoryAdjusted, listeners.HandleCashFlowOnInventoryAdjusted)
+
 	// --- TRANSACTION Module ---
-	transactionRepo := repositories.NewTransactionRepository(database.DB)
+	transactionRepo := repositories.NewTransactionRepository(database.DB, eventBus)
 	transactionService := services.NewTransactionService(transactionRepo, productRepo)
 	transactionHandler := handlers.NewTransactionHandler(transactionService)
 
@@ -94,9 +103,14 @@ func main() {
 	categoryService := services.NewCategoryService(categoryRepo)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
+	// --- CASH FLOW Module ---
+	cashFlowRepo := repositories.NewCashFlowRepository(database.DB)
+	cashFlowService := services.NewCashFlowService(cashFlowRepo)
+	cashFlowHandler := handlers.NewCashFlowHandler(cashFlowService)
+
 	// --- DASHBOARD Module ---
 	dashboardRepo := repositories.NewDashboardRepository(database.DB)
-	dashboardService := services.NewDashboardService(dashboardRepo)
+	dashboardService := services.NewDashboardService(dashboardRepo, cashFlowRepo)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
 
 	// --- REPORT Module ---
@@ -108,6 +122,22 @@ func main() {
 	storeSettingRepo := repositories.NewStoreSettingRepository(database.DB)
 	storeSettingService := services.NewStoreSettingService(storeSettingRepo)
 	storeSettingHandler := handlers.NewStoreSettingHandler(storeSettingService)
+
+	// --- EXPORT Module ---
+	exportHandler := handlers.NewExportHandler(productService, transactionService)
+
+	// --- BARCODE Module ---
+	barcodeHandler := handlers.NewBarcodeHandler(productService)
+
+	// --- INVENTORY LOG Module ---
+	inventoryLogRepo := repositories.NewInventoryLogRepository(database.DB, eventBus)
+	inventoryLogService := services.NewInventoryLogService(inventoryLogRepo, productRepo)
+	inventoryLogHandler := handlers.NewInventoryLogHandler(inventoryLogService)
+
+	// --- PAYMENT METHOD Module ---
+	paymentMethodRepo := repositories.NewPaymentMethodRepository(database.DB)
+	paymentMethodService := services.NewPaymentMethodService(paymentMethodRepo)
+	paymentMethodHandler := handlers.NewPaymentMethodHandler(paymentMethodService)
 
 	// 5. Definisi Route
 	// Health Check
@@ -137,8 +167,14 @@ func main() {
 		reportHandler,
 		authHandler,
 		storeSettingHandler,
+		exportHandler,
+		barcodeHandler,
+		inventoryLogHandler,
+		cashFlowHandler,
+		paymentMethodHandler,
 	)
 
 	// 6. Jalankan Server
-	log.Fatal(app.Listen(":" + port))
+	slog.Info("Starting server on port " + cfg.AppPort)
+	log.Fatal(app.Listen(":" + cfg.AppPort))
 }

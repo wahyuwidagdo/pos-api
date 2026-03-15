@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS transaction_details;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS inventory_logs;
+DROP TABLE IF EXISTS cash_flows;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS payment_methods;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS store_settings;

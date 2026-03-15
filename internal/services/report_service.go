@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -31,9 +32,9 @@ type ProductReportResponse struct {
 
 // ReportService defines the contract for report business logic
 type ReportService interface {
-	GetSalesReport(startDate, endDate string) (*SalesReportResponse, error)
-	GetProductReport(startDate, endDate string, limit int) (*ProductReportResponse, error)
-	GetStockValue() (*repositories.StockValue, error)
+	GetSalesReport(ctx context.Context, startDate, endDate string) (*SalesReportResponse, error)
+	GetProductReport(ctx context.Context, startDate, endDate string, limit int) (*ProductReportResponse, error)
+	GetStockValue(ctx context.Context) (*repositories.StockValue, error)
 }
 
 type reportService struct {
@@ -46,7 +47,7 @@ func NewReportService(repo repositories.ReportRepository) ReportService {
 }
 
 // GetSalesReport retrieves the sales report for a date range
-func (s *reportService) GetSalesReport(startDateStr, endDateStr string) (*SalesReportResponse, error) {
+func (s *reportService) GetSalesReport(ctx context.Context, startDateStr, endDateStr string) (*SalesReportResponse, error) {
 	startDate, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
 		return nil, errors.New("format tanggal mulai tidak valid (gunakan YYYY-MM-DD)")
@@ -62,19 +63,19 @@ func (s *reportService) GetSalesReport(startDateStr, endDateStr string) (*SalesR
 	}
 
 	// Get summary
-	summary, err := s.repo.GetSalesSummary(startDate, endDate)
+	summary, err := s.repo.GetSalesSummary(ctx, startDate, endDate)
 	if err != nil {
 		return nil, errors.New("gagal mengambil ringkasan penjualan")
 	}
 
 	// Get daily data
-	dailyData, err := s.repo.GetSalesReport(startDate, endDate)
+	dailyData, err := s.repo.GetSalesReport(ctx, startDate, endDate)
 	if err != nil {
 		return nil, errors.New("gagal mengambil data penjualan harian")
 	}
 
 	// Get hourly data
-	hourlyData, err := s.repo.GetSalesByHour(startDate, endDate)
+	hourlyData, err := s.repo.GetSalesByHour(ctx, startDate, endDate)
 	if err != nil {
 		hourlyData = []repositories.HourlySales{} // non-critical, fallback
 	}
@@ -89,7 +90,7 @@ func (s *reportService) GetSalesReport(startDateStr, endDateStr string) (*SalesR
 }
 
 // GetProductReport retrieves the product performance report for a date range
-func (s *reportService) GetProductReport(startDateStr, endDateStr string, limit int) (*ProductReportResponse, error) {
+func (s *reportService) GetProductReport(ctx context.Context, startDateStr, endDateStr string, limit int) (*ProductReportResponse, error) {
 	startDate, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
 		return nil, errors.New("format tanggal mulai tidak valid (gunakan YYYY-MM-DD)")
@@ -109,7 +110,7 @@ func (s *reportService) GetProductReport(startDateStr, endDateStr string, limit 
 		limit = 20
 	}
 
-	products, err := s.repo.GetProductReport(startDate, endDate, limit)
+	products, err := s.repo.GetProductReport(ctx, startDate, endDate, limit)
 	if err != nil {
 		return nil, errors.New("gagal mengambil laporan produk")
 	}
@@ -122,6 +123,6 @@ func (s *reportService) GetProductReport(startDateStr, endDateStr string, limit 
 }
 
 // GetStockValue retrieves the current stock value
-func (s *reportService) GetStockValue() (*repositories.StockValue, error) {
-	return s.repo.GetStockValue()
+func (s *reportService) GetStockValue(ctx context.Context) (*repositories.StockValue, error) {
+	return s.repo.GetStockValue(ctx)
 }

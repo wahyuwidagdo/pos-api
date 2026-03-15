@@ -41,7 +41,7 @@ func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input JSON tidak valid"})
 	}
 
-	product, err := h.service.CreateProduct(req)
+	product, err := h.service.CreateProduct(c.UserContext(), req)
 	if err != nil {
 		if customErrors.Is(err, customErrors.ErrConflict) {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "SKU atau nama produk sudah ada (duplikat)."}) // 409
@@ -72,7 +72,7 @@ func (h *ProductHandler) GetProduct(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID produk tidak valid"})
 	}
 
-	product, err := h.service.GetProduct(uint(id))
+	product, err := h.service.GetProduct(c.UserContext(), uint(id))
 	if err != nil {
 		if customErrors.Is(err, customErrors.ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Produk tidak ditemukan."}) // 404
@@ -113,8 +113,9 @@ func (h *ProductHandler) ListProducts(c *fiber.Ctx) error {
 	stockFilter := c.Query("stockFilter", "")
 	sortBy := c.Query("sortBy", "")
 	sortOrder := c.Query("sortOrder", "")
+	onlyTrashed := c.Query("trashed") == "true"
 
-	products, count, err := h.service.ListProducts(page, pageSize, search, stockFilter, sortBy, sortOrder)
+	products, count, err := h.service.ListProducts(c.UserContext(), page, pageSize, search, stockFilter, sortBy, sortOrder, onlyTrashed)
 	if err != nil {
 		// Asumsikan error adalah masalah internal/database
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil daftar produk: " + err.Error()})
@@ -142,7 +143,7 @@ func (h *ProductHandler) GetLowStockProducts(c *fiber.Ctx) error {
 		threshold = 10
 	}
 
-	products, err := h.service.GetLowStockProducts(threshold)
+	products, err := h.service.GetLowStockProducts(c.UserContext(), threshold)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Gagal mengambil produk stok rendah: " + err.Error(),
@@ -187,7 +188,7 @@ func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 	}
 
 	// 3. Panggil service untuk update
-	updatedProduct, err := h.service.UpdateProduct(uint(id), req)
+	updatedProduct, err := h.service.UpdateProduct(c.UserContext(), uint(id), req)
 	if err != nil {
 		// --- Custom Error Handling ---
 		if customErrors.Is(err, customErrors.ErrNotFound) {
@@ -228,7 +229,7 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	}
 
 	// 2. Panggil service untuk delete
-	if err := h.service.DeleteProduct(uint(id)); err != nil {
+	if err := h.service.DeleteProduct(c.UserContext(), uint(id)); err != nil {
 		if customErrors.Is(err, customErrors.ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Produk yang ingin dihapus tidak ditemukan."}) // 404
 		}
@@ -245,9 +246,37 @@ func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	})
 }
 
+// RestoreProduct handles POST /products/{id}/restore
+func (h *ProductHandler) RestoreProduct(c *fiber.Ctx) error {
+	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID produk tidak valid"})
+	}
+
+	if err := h.service.RestoreProduct(c.UserContext(), uint(id)); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal memulihkan produk: " + err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Produk berhasil dipulihkan"})
+}
+
+// ForceDeleteProduct handles DELETE /products/{id}/force
+func (h *ProductHandler) ForceDeleteProduct(c *fiber.Ctx) error {
+	id, err := strconv.ParseUint(c.Params("id"), 10, 32)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID produk tidak valid"})
+	}
+
+	if err := h.service.ForceDeleteProduct(c.UserContext(), uint(id)); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghapus produk secara permanen: " + err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Produk berhasil dihapus permanen"})
+}
+
 // GetStockCounts handles GET /products/stock-counts
 func (h *ProductHandler) GetStockCounts(c *fiber.Ctx) error {
-	counts, err := h.service.GetStockCounts()
+	counts, err := h.service.GetStockCounts(c.UserContext())
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

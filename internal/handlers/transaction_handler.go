@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"pos-api/internal/services"
 
@@ -40,7 +41,7 @@ func (h *TransactionHandler) GetTransaction(c *fiber.Ctx) error {
 	}
 
 	// 2. Panggil Service Layer
-	transaction, err := h.service.GetTransaction(uint(id))
+	transaction, err := h.service.GetTransaction(c.UserContext(), uint(id))
 
 	// 3. Handle Error dari Service Layer
 	if err != nil {
@@ -72,18 +73,22 @@ func (h *TransactionHandler) GetTransaction(c *fiber.Ctx) error {
 // @Failure      500 {object} utils.ErrorResponse "Internal server error"
 // @Router       /transactions [get]
 func (h *TransactionHandler) ListTransactions(c *fiber.Ctx) error {
-	// 1. Panggil Service Layer
-	transactions, err := h.service.ListTransactions()
+	// 1. Parse Query Params
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
 
-	// 2. Handle Error
+	// 2. Panggil Service Layer
+	paginationData, err := h.service.ListTransactions(c.UserContext(), page, limit)
+
+	// 3. Handle Error
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil daftar transaksi"})
 	}
 
-	// 3. Kirim Respons Sukses (200 OK)
+	// 4. Kirim Respons Sukses (200 OK)
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Daftar transaksi berhasil diambil",
-		"data":    transactions,
+		"data":    paginationData,
 	})
 }
 
@@ -113,9 +118,21 @@ func (h *TransactionHandler) CreateTransaction(c *fiber.Ctx) error {
 		})
 	}
 
+	// Ambil UserID dari middleware JWT
+	userIDStr := fmt.Sprintf("%v", c.Locals("userID"))
+	if userIDStr != "<nil>" && userIDStr != "" {
+		var uid uint
+		fmt.Sscanf(userIDStr, "%d", &uid)
+		req.UserID = uid
+	} else {
+		// Fallback for tests or missing auth
+		req.UserID = 1
+	}
+
 	// 2. Panggil Service Layer untuk memproses logika bisnis
-	// Validasi input sudah di-handle di dalam service.ProcessTransaction
-	transaction, err := h.service.ProcessTransaction(req)
+	// Inject UserID into context so Repository/Events can use it
+	ctx := context.WithValue(c.UserContext(), "userID", req.UserID)
+	transaction, err := h.service.ProcessTransaction(ctx, req)
 
 	// 3. Handle Error dari Service Layer
 	if err != nil {
@@ -134,4 +151,32 @@ func (h *TransactionHandler) CreateTransaction(c *fiber.Ctx) error {
 		"message": "Transaksi berhasil diproses",
 		"data":    transaction,
 	})
+}
+
+// CancelTransaction handles POST /transactions/:id/cancel
+func (h *TransactionHandler) CancelTransaction(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID transaksi tidak valid"})
+	}
+
+	if err := h.service.CancelTransaction(c.UserContext(), uint(id)); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Transaksi berhasil dibatalkan"})
+}
+
+// ReturnTransaction handles POST /transactions/:id/return
+func (h *TransactionHandler) ReturnTransaction(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID transaksi tidak valid"})
+	}
+
+	if err := h.service.ReturnTransaction(c.UserContext(), uint(id)); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Transaksi berhasil diretur"})
 }

@@ -17,7 +17,7 @@ func NewStoreSettingHandler(s services.StoreSettingService) *StoreSettingHandler
 
 // GetStoreSettings handles GET /store-settings
 func (h *StoreSettingHandler) GetStoreSettings(c *fiber.Ctx) error {
-	settings, err := h.service.GetSettings()
+	settings, err := h.service.GetSettings(c.UserContext())
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Gagal mengambil pengaturan toko",
@@ -39,7 +39,7 @@ func (h *StoreSettingHandler) UpdateStoreSettings(c *fiber.Ctx) error {
 		})
 	}
 
-	settings, err := h.service.UpdateSettings(&req)
+	settings, err := h.service.UpdateSettings(c.UserContext(), &req)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Gagal menyimpan pengaturan toko",

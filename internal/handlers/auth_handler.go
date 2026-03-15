@@ -48,7 +48,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Validasi gagal: " + err.Error()})
 	}
 
-	user, err := h.service.Register(req)
+	user, err := h.service.Register(c.UserContext(), req)
 	if err != nil {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -75,7 +75,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input tidak valid"})
 	}
 
-	token, user, err := h.service.Login(req)
+	token, user, err := h.service.Login(c.UserContext(), req)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -101,7 +101,7 @@ func (h *AuthHandler) GetProfile(c *fiber.Ctx) error {
 	}
 	userID := uint(userIDFloat)
 
-	user, err := h.service.GetProfile(userID)
+	user, err := h.service.GetProfile(c.UserContext(), userID)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -123,7 +123,7 @@ func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input tidak valid"})
 	}
 
-	user, err := h.service.UpdateProfile(userID, req)
+	user, err := h.service.UpdateProfile(c.UserContext(), userID, req)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -149,7 +149,7 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Password fields are required"})
 	}
 
-	err := h.service.ChangePassword(userID, req)
+	err := h.service.ChangePassword(c.UserContext(), userID, req)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}

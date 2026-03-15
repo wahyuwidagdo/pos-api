@@ -1,11 +1,13 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"pos-api/internal/models"
+	"pos-api/internal/pkg/events"
 	"pos-api/internal/repositories"
 
 	"github.com/go-playground/validator/v10"
@@ -24,12 +26,24 @@ type TransactionRequest struct {
 	Cash          float64       `json:"cash" validate:"required,gte=0"`     // Uang yang dibayarkan pelanggan
 	Discount      float64       `json:"discount" validate:"gte=0"`
 	Items         []ItemRequest `json:"items" validate:"required,min=1"` // Daftar produk yang dibeli
+	UserID        uint          // Added for Event-Driven Architecture (Cashier ID)
+}
+
+// PaginationResult wraps data with metadata
+type PaginationData struct {
+	Total       int64       `json:"total_items"`
+	TotalPages  int         `json:"total_pages"`
+	CurrentPage int         `json:"current_page"`
+	Limit       int         `json:"limit"`
+	Data        interface{} `json:"data"`
 }
 
 type TransactionService interface {
-	ProcessTransaction(req TransactionRequest) (*models.Transaction, error)
-	GetTransaction(id uint) (*models.Transaction, error)
-	ListTransactions() ([]models.Transaction, error)
+	ProcessTransaction(ctx context.Context, req TransactionRequest) (*models.Transaction, error)
+	GetTransaction(ctx context.Context, id uint) (*models.Transaction, error)
+	ListTransactions(ctx context.Context, page int, limit int) (*PaginationData, error)
+	CancelTransaction(ctx context.Context, id uint) error
+	ReturnTransaction(ctx context.Context, id uint) error
 }
 
 type transactionService struct {
@@ -46,8 +60,8 @@ func NewTransactionService(repo repositories.TransactionRepository, productRepo 
 	}
 }
 
-func (s *transactionService) GetTransaction(id uint) (*models.Transaction, error) {
-	transaction, err := s.repo.GetTransactionByID(id)
+func (s *transactionService) GetTransaction(ctx context.Context, id uint) (*models.Transaction, error) {
+	transaction, err := s.repo.GetTransactionByID(ctx, id)
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -60,18 +74,36 @@ func (s *transactionService) GetTransaction(id uint) (*models.Transaction, error
 	return transaction, nil
 }
 
-func (s *transactionService) ListTransactions() ([]models.Transaction, error) {
-	transaction, err := s.repo.ListTransactions()
+func (s *transactionService) ListTransactions(ctx context.Context, page int, limit int) (*PaginationData, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+
+	transactions, totalItem, err := s.repo.ListTransactions(ctx, page, limit)
 
 	if err != nil {
 		// Asumsi error yang dikembalikan adalah error database, tidak perlu penanganan not found
 		return nil, fmt.Errorf("gagal menampilkan daftar transaksi: %w", err)
 	}
 
-	return transaction, nil
+	totalPages := int(totalItem) / limit
+	if int(totalItem)%limit != 0 {
+		totalPages++
+	}
+
+	return &PaginationData{
+		Total:       totalItem,
+		TotalPages:  totalPages,
+		CurrentPage: page,
+		Limit:       limit,
+		Data:        transactions,
+	}, nil
 }
 
-func (s *transactionService) ProcessTransaction(req TransactionRequest) (*models.Transaction, error) {
+func (s *transactionService) ProcessTransaction(ctx context.Context, req TransactionRequest) (*models.Transaction, error) {
 	// 1. Validasi Input Request (Wajib dilakukan di Service Layer)
 	if err := s.validator.Struct(req); err != nil {
 		return nil, errors.New("validasi gagal: " + err.Error())
@@ -81,43 +113,33 @@ func (s *transactionService) ProcessTransaction(req TransactionRequest) (*models
 	var (
 		totalAmount        float64 // Total sebelum diskon
 		transactionDetails []models.TransactionDetail
-		productUpdates     = make(map[uint]int) // Untuk menyimpan (ProductID -> StokBaru)
 	)
-
-	// 2. Loop melalui setiap Item di Request untuk Kalkulasi dan Verifikasi Stok
+	// Note: We don't check for stock here anymore, because the Repository does it atomically.
+	// However, we can still do a read-only check for better UX (fail fast), but we won't rely on it for data integrity.
 	for _, itemReq := range req.Items {
-		// 2a. Ambil Produk dari DB untuk mendapatkan harga & stok saat ini
-		product, err := s.productRepo.GetProductByID(itemReq.ProductID)
+		// 2a. Get Product
+		product, err := s.productRepo.GetProductByID(ctx, itemReq.ProductID)
 		if err != nil {
-			// Asumsi gorm.ErrRecordNotFound sudah di-handle di ProductRepo/Service
 			return nil, fmt.Errorf("produk dengan ID %d tidak ditemukan", itemReq.ProductID)
 		}
 
-		// 2b. Verifikasi Stok
-		if product.Stock < itemReq.Quantity {
-			return nil, fmt.Errorf("stok %s tidak cukup. Tersedia: %d", product.Name, product.Stock)
-		}
-
-		// 2c. Kalkulasi Subtotal & Total Keseluruhan
+		// 2c. Calculate Subtotal & Total
 		priceAtSale := product.Price
 		subTotal := priceAtSale * float64(itemReq.Quantity)
 		totalAmount += subTotal
 
-		// 2d. Siapkan Detail Transaksi
+		// 2d. Prepare Transaction Detail
 		transactionDetails = append(transactionDetails, models.TransactionDetail{
 			ProductID:   itemReq.ProductID,
-			ProductName: product.Name, // Simpan cache nama
+			ProductName: product.Name,
 			Quantity:    itemReq.Quantity,
 			PriceAtSale: priceAtSale,
-			CostAtSale:  product.Cost, // Simpan harga beli untuk kalkulasi laba
+			CostAtSale:  product.Cost,
 			SubTotal:    subTotal,
 		})
-
-		// 2e. Siapkan Update Stok
-		productUpdates[itemReq.ProductID] = product.Stock - itemReq.Quantity
 	}
 
-	// 3. Kalkulasi Akhir (Total, Diskon, Kembalian)
+	// 3. Final Calculation
 	grandTotal := totalAmount - req.Discount
 	change := req.Cash - grandTotal
 
@@ -125,29 +147,62 @@ func (s *transactionService) ProcessTransaction(req TransactionRequest) (*models
 		return nil, errors.New("jumlah uang tunai kurang")
 	}
 
-	// 4. Bangun Struct Transaction Utama
+	// 4. Build Main Transaction Struct
 	transaction := models.Transaction{
-		TransactionCode:    fmt.Sprintf("INV-%d", time.Now().UnixNano()), // Kode unik sementara
+		TransactionCode:    fmt.Sprintf("INV-%d", time.Now().UnixNano()),
 		TotalAmount:        totalAmount,
 		Discount:           req.Discount,
 		GrandTotal:         grandTotal,
 		Cash:               req.Cash,
 		Change:             change,
 		PaymentMethod:      req.PaymentMethod,
-		TransactionDetails: transactionDetails, // Relasi sudah terisi di sini
+		TransactionDetails: transactionDetails,
 	}
 
-	// 5. Panggil Transaction Repository (Running DB Transaction)
-	if err := s.repo.ProcessFullTransaction(&transaction, productUpdates); err != nil {
-		// Jika gagal, Repository sudah melakukan Rollback
-		return nil, errors.New("gagal memproses transaksi di database: " + err.Error())
+	// 5. Call Repository (Atomic Transaction)
+	if err := s.repo.ProcessFullTransaction(ctx, &transaction); err != nil {
+		return nil, errors.New("gagal memproses transaksi: " + err.Error())
 	}
 
 	// 6. Selesai! Kembalikan Transaksi yang sudah tersimpan (dengan ID)
-	finalTransaction, err := s.GetTransaction(transaction.ID)
+	finalTransaction, err := s.GetTransaction(ctx, transaction.ID)
 	if err != nil {
 		return &transaction, nil
 	}
 
 	return finalTransaction, nil
+}
+
+func (s *transactionService) CancelTransaction(ctx context.Context, id uint) error {
+	tx, err := s.repo.GetTransactionByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("transaksi dengan ID %d tidak ditemukan", id)
+	}
+	if tx.Status != "completed" {
+		return fmt.Errorf("transaksi sudah berstatus '%s', tidak bisa dibatalkan", tx.Status)
+	}
+
+	// Update status and fire event
+	if err := s.repo.UpdateTransactionState(ctx, tx, "cancelled", events.EventTransactionCancelled); err != nil {
+		return fmt.Errorf("gagal membatalkan transaksi: %w", err)
+	}
+
+	return nil
+}
+
+func (s *transactionService) ReturnTransaction(ctx context.Context, id uint) error {
+	tx, err := s.repo.GetTransactionByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("transaksi dengan ID %d tidak ditemukan", id)
+	}
+	if tx.Status != "completed" {
+		return fmt.Errorf("transaksi sudah berstatus '%s', tidak bisa diretur", tx.Status)
+	}
+
+	// Update status and fire event
+	if err := s.repo.UpdateTransactionState(ctx, tx, "returned", events.EventTransactionReturned); err != nil {
+		return fmt.Errorf("gagal meretur transaksi: %w", err)
+	}
+
+	return nil
 }

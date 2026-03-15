@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"time"
 
 	"gorm.io/gorm"
@@ -42,11 +43,11 @@ type StockValue struct {
 
 // ReportRepository defines the contract for report data access
 type ReportRepository interface {
-	GetSalesReport(startDate, endDate time.Time) ([]SalesReport, error)
-	GetProductReport(startDate, endDate time.Time, limit int) ([]ProductReport, error)
-	GetSalesSummary(startDate, endDate time.Time) (*SalesSummary, error)
-	GetSalesByHour(startDate, endDate time.Time) ([]HourlySales, error)
-	GetStockValue() (*StockValue, error)
+	GetSalesReport(ctx context.Context, startDate, endDate time.Time) ([]SalesReport, error)
+	GetProductReport(ctx context.Context, startDate, endDate time.Time, limit int) ([]ProductReport, error)
+	GetSalesSummary(ctx context.Context, startDate, endDate time.Time) (*SalesSummary, error)
+	GetSalesByHour(ctx context.Context, startDate, endDate time.Time) ([]HourlySales, error)
+	GetStockValue(ctx context.Context) (*StockValue, error)
 }
 
 // SalesSummary represents the summary of sales for a period
@@ -69,10 +70,10 @@ func NewReportRepository(db *gorm.DB) ReportRepository {
 }
 
 // GetSalesReport retrieves daily sales data for a date range
-func (r *reportRepository) GetSalesReport(startDate, endDate time.Time) ([]SalesReport, error) {
+func (r *reportRepository) GetSalesReport(ctx context.Context, startDate, endDate time.Time) ([]SalesReport, error) {
 	var reports []SalesReport
 
-	err := r.db.Table("transactions").
+	err := r.db.WithContext(ctx).Table("transactions").
 		Select(`
 			DATE(created_at) as date,
 			COALESCE(SUM(grand_total), 0) as total_sales,
@@ -90,7 +91,7 @@ func (r *reportRepository) GetSalesReport(startDate, endDate time.Time) ([]Sales
 	for i := range reports {
 		var itemsSold int64
 		dateStr := reports[i].Date
-		r.db.Table("transaction_details").
+		r.db.WithContext(ctx).Table("transaction_details").
 			Joins("JOIN transactions ON transactions.id = transaction_details.transaction_id").
 			Where("DATE(transactions.created_at) = ?", dateStr).
 			Select("COALESCE(SUM(transaction_details.quantity), 0)").
@@ -105,10 +106,10 @@ func (r *reportRepository) GetSalesReport(startDate, endDate time.Time) ([]Sales
 }
 
 // GetProductReport retrieves product sales performance for a date range
-func (r *reportRepository) GetProductReport(startDate, endDate time.Time, limit int) ([]ProductReport, error) {
+func (r *reportRepository) GetProductReport(ctx context.Context, startDate, endDate time.Time, limit int) ([]ProductReport, error) {
 	var reports []ProductReport
 
-	query := r.db.Table("transaction_details").
+	query := r.db.WithContext(ctx).Table("transaction_details").
 		Select(`
 			transaction_details.product_id,
 			transaction_details.product_name,
@@ -137,10 +138,10 @@ func (r *reportRepository) GetProductReport(startDate, endDate time.Time, limit 
 }
 
 // GetSalesSummary retrieves the overall summary for a date range
-func (r *reportRepository) GetSalesSummary(startDate, endDate time.Time) (*SalesSummary, error) {
+func (r *reportRepository) GetSalesSummary(ctx context.Context, startDate, endDate time.Time) (*SalesSummary, error) {
 	var summary SalesSummary
 
-	err := r.db.Table("transactions").
+	err := r.db.WithContext(ctx).Table("transactions").
 		Select("COALESCE(SUM(grand_total), 0) as total_sales, COUNT(*) as total_transactions").
 		Where("created_at >= ? AND created_at < ?", startDate, endDate.Add(24*time.Hour)).
 		Scan(&summary).Error
@@ -150,7 +151,7 @@ func (r *reportRepository) GetSalesSummary(startDate, endDate time.Time) (*Sales
 
 	// Get total items sold
 	var itemsSold int64
-	r.db.Table("transaction_details").
+	r.db.WithContext(ctx).Table("transaction_details").
 		Joins("JOIN transactions ON transactions.id = transaction_details.transaction_id").
 		Where("transactions.created_at >= ? AND transactions.created_at < ?", startDate, endDate.Add(24*time.Hour)).
 		Select("COALESCE(SUM(transaction_details.quantity), 0)").
@@ -159,7 +160,7 @@ func (r *reportRepository) GetSalesSummary(startDate, endDate time.Time) (*Sales
 
 	// Get gross profit (revenue - cost)
 	var totalCost float64
-	r.db.Table("transaction_details").
+	r.db.WithContext(ctx).Table("transaction_details").
 		Joins("JOIN transactions ON transactions.id = transaction_details.transaction_id").
 		Where("transactions.created_at >= ? AND transactions.created_at < ?", startDate, endDate.Add(24*time.Hour)).
 		Select("COALESCE(SUM(transaction_details.cost_at_sale * transaction_details.quantity), 0)").
@@ -179,10 +180,10 @@ func (r *reportRepository) GetSalesSummary(startDate, endDate time.Time) (*Sales
 }
 
 // GetSalesByHour retrieves sales grouped by hour of day
-func (r *reportRepository) GetSalesByHour(startDate, endDate time.Time) ([]HourlySales, error) {
+func (r *reportRepository) GetSalesByHour(ctx context.Context, startDate, endDate time.Time) ([]HourlySales, error) {
 	var hourly []HourlySales
 
-	err := r.db.Table("transactions").
+	err := r.db.WithContext(ctx).Table("transactions").
 		Select(`
 			EXTRACT(HOUR FROM created_at)::int as hour,
 			COALESCE(SUM(grand_total), 0) as total_sales,
@@ -200,10 +201,10 @@ func (r *reportRepository) GetSalesByHour(startDate, endDate time.Time) ([]Hourl
 }
 
 // GetStockValue calculates the total inventory value
-func (r *reportRepository) GetStockValue() (*StockValue, error) {
+func (r *reportRepository) GetStockValue(ctx context.Context) (*StockValue, error) {
 	var sv StockValue
 
-	err := r.db.Table("products").
+	err := r.db.WithContext(ctx).Table("products").
 		Select(`
 			COUNT(*) as total_products,
 			COALESCE(SUM(stock), 0) as total_units,

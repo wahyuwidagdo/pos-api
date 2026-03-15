@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"pos-api/internal/models"
 	"time"
 
@@ -41,13 +42,14 @@ type PaymentMethodData struct {
 
 // DashboardRepository defines the contract for dashboard data access
 type DashboardRepository interface {
-	GetDashboardStats(startDate, endDate time.Time) (*DashboardStats, error)
-	GetTopProducts(startDate, endDate time.Time, limit int) ([]TopProduct, error)
-	GetLowStockCount(threshold int) (int64, error)
-	GetLowStockProducts(threshold int, limit int) ([]LowStockProduct, error)
-	GetRevenueTrend(startDate, endDate time.Time) ([]RevenueData, error)
-	GetRecentTransactions(limit int) ([]TransactionSummary, error)
-	GetPaymentMethodBreakdown(startDate, endDate time.Time) ([]PaymentMethodData, error)
+	GetDashboardStats(ctx context.Context, startDate, endDate time.Time) (*DashboardStats, error)
+	GetTopProducts(ctx context.Context, startDate, endDate time.Time, limit int) ([]TopProduct, error)
+	GetLowStockCount(ctx context.Context, threshold int) (int64, error)
+	GetLowStockProducts(ctx context.Context, threshold int, limit int) ([]LowStockProduct, error)
+	GetRevenueTrend(ctx context.Context, startDate, endDate time.Time) ([]RevenueData, error)
+	GetHourlyRevenueTrend(ctx context.Context, startDate, endDate time.Time) ([]RevenueData, error)
+	GetRecentTransactions(ctx context.Context, limit int) ([]TransactionSummary, error)
+	GetPaymentMethodBreakdown(ctx context.Context, startDate, endDate time.Time) ([]PaymentMethodData, error)
 }
 
 type RevenueData struct {
@@ -75,13 +77,13 @@ func NewDashboardRepository(db *gorm.DB) DashboardRepository {
 }
 
 // GetDashboardStats retrieves aggregated stats for a date range
-func (r *dashboardRepository) GetDashboardStats(startDate, endDate time.Time) (*DashboardStats, error) {
+func (r *dashboardRepository) GetDashboardStats(ctx context.Context, startDate, endDate time.Time) (*DashboardStats, error) {
 	var stats DashboardStats
 
 	// Get sales and transaction count
-	err := r.db.Table("transactions").
+	err := r.db.WithContext(ctx).Table("transactions").
 		Select("COALESCE(SUM(grand_total), 0) as today_sales, COUNT(*) as today_transactions").
-		Where("created_at >= ? AND created_at < ?", startDate, endDate).
+		Where("created_at >= ? AND created_at < ? AND status = 'completed'", startDate, endDate).
 		Scan(&stats).Error
 	if err != nil {
 		return nil, err
@@ -89,9 +91,9 @@ func (r *dashboardRepository) GetDashboardStats(startDate, endDate time.Time) (*
 
 	// Get items sold count
 	var itemsSold int64
-	err = r.db.Table("transaction_details").
+	err = r.db.WithContext(ctx).Table("transaction_details").
 		Joins("JOIN transactions ON transactions.id = transaction_details.transaction_id").
-		Where("transactions.created_at >= ? AND transactions.created_at < ?", startDate, endDate).
+		Where("transactions.created_at >= ? AND transactions.created_at < ? AND transactions.status = 'completed'", startDate, endDate).
 		Select("COALESCE(SUM(transaction_details.quantity), 0)").
 		Scan(&itemsSold).Error
 	if err != nil {
@@ -103,13 +105,13 @@ func (r *dashboardRepository) GetDashboardStats(startDate, endDate time.Time) (*
 }
 
 // GetTopProducts retrieves the top-selling products for a date range
-func (r *dashboardRepository) GetTopProducts(startDate, endDate time.Time, limit int) ([]TopProduct, error) {
+func (r *dashboardRepository) GetTopProducts(ctx context.Context, startDate, endDate time.Time, limit int) ([]TopProduct, error) {
 	var topProducts []TopProduct
 
-	err := r.db.Table("transaction_details").
+	err := r.db.WithContext(ctx).Table("transaction_details").
 		Select("transaction_details.product_id, transaction_details.product_name, SUM(transaction_details.quantity) as quantity, SUM(transaction_details.sub_total) as revenue").
 		Joins("JOIN transactions ON transactions.id = transaction_details.transaction_id").
-		Where("transactions.created_at >= ? AND transactions.created_at < ?", startDate, endDate).
+		Where("transactions.created_at >= ? AND transactions.created_at < ? AND transactions.status = 'completed'", startDate, endDate).
 		Group("transaction_details.product_id, transaction_details.product_name").
 		Order("quantity DESC").
 		Limit(limit).
@@ -122,20 +124,20 @@ func (r *dashboardRepository) GetTopProducts(startDate, endDate time.Time, limit
 }
 
 // GetLowStockCount returns the count of products below the threshold
-func (r *dashboardRepository) GetLowStockCount(threshold int) (int64, error) {
+func (r *dashboardRepository) GetLowStockCount(ctx context.Context, threshold int) (int64, error) {
 	var count int64
-	err := r.db.Table("products").
-		Where("stock <= ?", threshold).
+	err := r.db.WithContext(ctx).Model(&models.Product{}).
+		Where("stock < ?", threshold).
 		Count(&count).Error
 	return count, err
 }
 
 // GetLowStockProducts returns products below the stock threshold
-func (r *dashboardRepository) GetLowStockProducts(threshold int, limit int) ([]LowStockProduct, error) {
+func (r *dashboardRepository) GetLowStockProducts(ctx context.Context, threshold int, limit int) ([]LowStockProduct, error) {
 	var products []LowStockProduct
-	err := r.db.Table("products").
+	err := r.db.WithContext(ctx).Model(&models.Product{}).
 		Select("id, name, sku, stock").
-		Where("stock <= ?", threshold).
+		Where("stock < ?", threshold).
 		Order("stock ASC").
 		Limit(limit).
 		Scan(&products).Error
@@ -143,7 +145,7 @@ func (r *dashboardRepository) GetLowStockProducts(threshold int, limit int) ([]L
 }
 
 // GetRevenueTrend retrieves revenue data between two dates
-func (r *dashboardRepository) GetRevenueTrend(startDate, endDate time.Time) ([]RevenueData, error) {
+func (r *dashboardRepository) GetRevenueTrend(ctx context.Context, startDate, endDate time.Time) ([]RevenueData, error) {
 	var revenues []RevenueData
 
 	query := `
@@ -153,22 +155,49 @@ func (r *dashboardRepository) GetRevenueTrend(startDate, endDate time.Time) ([]R
 		FROM 
 			generate_series($1::date, $2::date, '1 day') AS d(day)
 		LEFT JOIN 
-			transactions t ON DATE(t.created_at) = d.day
+			transactions t ON DATE(t.created_at) = d.day AND t.status = 'completed'
 		GROUP BY 
 			d.day
 		ORDER BY 
 			d.day ASC
 	`
 
-	err := r.db.Raw(query, startDate, endDate).Scan(&revenues).Error
+	err := r.db.WithContext(ctx).Raw(query, startDate, endDate).Scan(&revenues).Error
 	return revenues, err
 }
 
-func (r *dashboardRepository) GetRecentTransactions(limit int) ([]TransactionSummary, error) {
+// GetHourlyRevenueTrend retrieves revenue data broken down by hour
+func (r *dashboardRepository) GetHourlyRevenueTrend(ctx context.Context, startDate, endDate time.Time) ([]RevenueData, error) {
+	var revenues []RevenueData
+
+	// Generate series for every hour in the day (00:00 to 23:00)
+	// We subtract 1 second from endDate to ensure we don't include the next day's 00:00 if it's exactly on the boundary,
+	// or we handle it via the generate_series limit.
+	// Using generate_series with timestamp requires careful handling of the upper bound.
+	// We want 00:00 to 23:00.
+	query := `
+		SELECT 
+			TO_CHAR(h.hour, 'HH24:00') as date,
+			COALESCE(SUM(t.grand_total), 0) as revenue
+		FROM 
+			generate_series($1::timestamp, $1::timestamp + interval '23 hours', '1 hour') AS h(hour)
+		LEFT JOIN 
+			transactions t ON DATE_TRUNC('hour', t.created_at) = h.hour AND t.status = 'completed'
+		GROUP BY 
+			h.hour
+		ORDER BY 
+			h.hour ASC
+	`
+
+	err := r.db.WithContext(ctx).Raw(query, startDate).Scan(&revenues).Error
+	return revenues, err
+}
+
+func (r *dashboardRepository) GetRecentTransactions(ctx context.Context, limit int) ([]TransactionSummary, error) {
 	var transactions []models.Transaction
 	var summaries []TransactionSummary
 
-	err := r.db.Order("created_at DESC").Limit(limit).Find(&transactions).Error
+	err := r.db.WithContext(ctx).Order("created_at DESC").Limit(limit).Find(&transactions).Error
 	if err != nil {
 		return nil, err
 	}
@@ -177,9 +206,9 @@ func (r *dashboardRepository) GetRecentTransactions(limit int) ([]TransactionSum
 		summaries = append(summaries, TransactionSummary{
 			ID:              t.ID,
 			TransactionCode: t.TransactionCode,
-			CustomerName:    "Walk-in Customer",
+			CustomerName:    "Umum",
 			TotalAmount:     t.GrandTotal,
-			Status:          "Completed",
+			Status:          t.Status,
 			Time:            t.CreatedAt.Format("03:04 PM"),
 			CreatedAt:       t.CreatedAt,
 		})
@@ -189,11 +218,11 @@ func (r *dashboardRepository) GetRecentTransactions(limit int) ([]TransactionSum
 }
 
 // GetPaymentMethodBreakdown retrieves payment method distribution for charts
-func (r *dashboardRepository) GetPaymentMethodBreakdown(startDate, endDate time.Time) ([]PaymentMethodData, error) {
+func (r *dashboardRepository) GetPaymentMethodBreakdown(ctx context.Context, startDate, endDate time.Time) ([]PaymentMethodData, error) {
 	var results []PaymentMethodData
-	err := r.db.Table("transactions").
+	err := r.db.WithContext(ctx).Table("transactions").
 		Select("payment_method as method, COUNT(*) as count, COALESCE(SUM(grand_total), 0) as total").
-		Where("created_at >= ? AND created_at < ?", startDate, endDate).
+		Where("created_at >= ? AND created_at < ? AND status = 'completed'", startDate, endDate).
 		Group("payment_method").
 		Order("total DESC").
 		Find(&results).Error

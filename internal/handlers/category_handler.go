@@ -37,7 +37,7 @@ func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input JSON tidak valid"})
 	}
 
-	category, err := h.service.CreateCategory(req)
+	category, err := h.service.CreateCategory(c.UserContext(), req)
 	if err != nil {
 		if customErrors.Is(err, customErrors.ErrConflict) {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Nama kategori sudah ada (duplikat)."}) // 409
@@ -68,7 +68,7 @@ func (h *CategoryHandler) GetCategory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID kategori tidak valid"})
 	}
 
-	category, err := h.service.GetCategory(uint(id))
+	category, err := h.service.GetCategory(c.UserContext(), uint(id))
 	if err != nil {
 		if customErrors.Is(err, customErrors.ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Kategori tidak ditemukan"}) // 404
@@ -82,17 +82,9 @@ func (h *CategoryHandler) GetCategory(c *fiber.Ctx) error {
 // ListCategories handles GET /categories
 // @Summary      List All Categories
 // @Description  Retrieve a list of all product categories. Requires Admin or Manager role.
-// @Tags         Categories
-// @Accept       json
-// @Produce      json
-// @Security     ApiKeyAuth
-// @Success      200 {object} utils.SuccessResponse{data=[]models.Category} "List of categories"
-// @Failure      401 {object} utils.ErrorResponse "Authentication required"
-// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
-// @Failure      500 {object} utils.ErrorResponse "Internal server error"
-// @Router       /categories [get]
 func (h *CategoryHandler) ListCategories(c *fiber.Ctx) error {
-	categories, err := h.service.ListCategories()
+	onlyTrashed := c.Query("trashed") == "true"
+	categories, err := h.service.ListCategories(c.UserContext(), onlyTrashed)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengambil daftar kategory"})
 	}
@@ -101,21 +93,6 @@ func (h *CategoryHandler) ListCategories(c *fiber.Ctx) error {
 }
 
 // UpdateCategory handles PUT /categories/{id}
-// @Summary      Update Category
-// @Description  Update an existing category by its ID. Requires Admin or Manager role.
-// @Tags         Categories
-// @Accept       json
-// @Produce      json
-// @Security     ApiKeyAuth
-// @Param        id path int true "Category ID"
-// @Param        request body services.CategoryRequest true "Updated category data"
-// @Success      200 {object} utils.SuccessResponse{data=models.Category} "Category updated successfully"
-// @Failure      400 {object} utils.ErrorResponse "Invalid input or validation error"
-// @Failure      401 {object} utils.ErrorResponse "Authentication required"
-// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
-// @Failure      404 {object} utils.ErrorResponse "Category not found"
-// @Failure      409 {object} utils.ErrorResponse "Category name conflicts with existing category"
-// @Router       /categories/{id} [put]
 func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
@@ -127,7 +104,7 @@ func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Input JSON tidak valid"})
 	}
 
-	updatedCategory, err := h.service.UpdateCategory(uint(id), req)
+	updatedCategory, err := h.service.UpdateCategory(c.UserContext(), uint(id), req)
 	if err != nil {
 		// --- Custom Error Handling ---
 		if customErrors.Is(err, customErrors.ErrNotFound) {
@@ -146,27 +123,13 @@ func (h *CategoryHandler) UpdateCategory(c *fiber.Ctx) error {
 }
 
 // DeleteCategory handles DELETE /categories/{id}
-// @Summary      Delete Category
-// @Description  Delete a category by its ID. Requires Admin or Manager role. Cannot delete if category is used by products.
-// @Tags         Categories
-// @Accept       json
-// @Produce      json
-// @Security     ApiKeyAuth
-// @Param        id path int true "Category ID"
-// @Success      200 {object} utils.SuccessResponse "Category deleted successfully"
-// @Failure      400 {object} utils.ErrorResponse "Invalid category ID"
-// @Failure      401 {object} utils.ErrorResponse "Authentication required"
-// @Failure      403 {object} utils.ErrorResponse "Insufficient permissions"
-// @Failure      404 {object} utils.ErrorResponse "Category not found"
-// @Failure      409 {object} utils.ErrorResponse "Category is used by products and cannot be deleted"
-// @Router       /categories/{id} [delete]
 func (h *CategoryHandler) DeleteCategory(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
 	if err != nil || id <= 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID karegori tidak valid"})
 	}
 
-	if err := h.service.DeleteCategory(uint(id)); err != nil {
+	if err := h.service.DeleteCategory(c.UserContext(), uint(id)); err != nil {
 		if customErrors.Is(err, customErrors.ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Kategori yang ingin dihapus tidak ditemukan."}) // 404
 		}
@@ -179,5 +142,43 @@ func (h *CategoryHandler) DeleteCategory(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "Kategori berhasil dihapus",
+	})
+}
+
+// RestoreCategory handles POST /categories/{id}/restore
+func (h *CategoryHandler) RestoreCategory(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID kategori tidak valid"})
+	}
+
+	if err := h.service.RestoreCategory(c.UserContext(), uint(id)); err != nil {
+		if customErrors.Is(err, customErrors.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Kategori tidak ditemukan"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal mengembalikan kategori: " + err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Kategori berhasil dikembalikan",
+	})
+}
+
+// ForceDeleteCategory handles DELETE /categories/{id}/force
+func (h *CategoryHandler) ForceDeleteCategory(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID kategori tidak valid"})
+	}
+
+	if err := h.service.ForceDeleteCategory(c.UserContext(), uint(id)); err != nil {
+		if customErrors.Is(err, customErrors.ErrNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Kategori tidak ditemukan"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Gagal menghapus kategori secara permanen: " + err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "Kategori berhasil dihapus secara permanen",
 	})
 }

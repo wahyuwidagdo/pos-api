@@ -12,7 +12,7 @@ import (
 const (
 	RoleAdmin   = "admin"
 	RoleManager = "manager"
-	RoleCashier = "cashier"
+	RoleCashier = "kasir"
 )
 
 // RBACMiddleware checks if the user's role allows access to the route.

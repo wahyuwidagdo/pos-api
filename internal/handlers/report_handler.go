@@ -43,7 +43,7 @@ func (h *ReportHandler) GetSalesReport(c *fiber.Ctx) error {
 		})
 	}
 
-	report, err := h.service.GetSalesReport(startDate, endDate)
+	report, err := h.service.GetSalesReport(c.UserContext(), startDate, endDate)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
@@ -88,7 +88,7 @@ func (h *ReportHandler) GetProductReport(c *fiber.Ctx) error {
 		limit = 20
 	}
 
-	report, err := h.service.GetProductReport(startDate, endDate, limit)
+	report, err := h.service.GetProductReport(c.UserContext(), startDate, endDate, limit)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
@@ -103,7 +103,7 @@ func (h *ReportHandler) GetProductReport(c *fiber.Ctx) error {
 
 // GetStockValue handles GET /reports/stock-value
 func (h *ReportHandler) GetStockValue(c *fiber.Ctx) error {
-	stockValue, err := h.service.GetStockValue()
+	stockValue, err := h.service.GetStockValue(c.UserContext())
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Gagal mengambil nilai stok",

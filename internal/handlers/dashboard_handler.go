@@ -32,7 +32,7 @@ func NewDashboardHandler(s services.DashboardService) *DashboardHandler {
 func (h *DashboardHandler) GetDashboard(c *fiber.Ctx) error {
 	dateRange := c.Query("range", "today")
 
-	dashboard, err := h.service.GetDashboard(dateRange)
+	dashboard, err := h.service.GetDashboard(c.UserContext(), dateRange)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Gagal mengambil data dashboard: " + err.Error(),

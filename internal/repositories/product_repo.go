@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"pos-api/internal/models"
 
 	"gorm.io/gorm"
@@ -8,13 +9,15 @@ import (
 
 // ProductRepository mendefinisikan kontrak untuk interaksi database produk.
 type ProductRepository interface {
-	CreateProduct(product *models.Product) error
-	GetProductByID(id uint) (*models.Product, error)
-	GetAllProducts(limit, offset int, search string, stockFilter string, sortBy string, sortOrder string) ([]models.Product, int64, error)
-	GetLowStockProducts(threshold int) ([]models.Product, error)
-	GetStockCounts() (map[string]int64, error)
-	UpdateProduct(product *models.Product) error
-	DeleteProduct(id uint) error
+	CreateProduct(ctx context.Context, product *models.Product) error
+	GetProductByID(ctx context.Context, id uint) (*models.Product, error)
+	GetAllProducts(ctx context.Context, limit, offset int, search string, stockFilter string, sortBy string, sortOrder string, onlyTrashed bool) ([]models.Product, int64, error)
+	GetLowStockProducts(ctx context.Context, threshold int) ([]models.Product, error)
+	GetStockCounts(ctx context.Context) (map[string]int64, error)
+	UpdateProduct(ctx context.Context, product *models.Product) error
+	DeleteProduct(ctx context.Context, id uint) error
+	RestoreProduct(ctx context.Context, id uint) error
+	ForceDeleteProduct(ctx context.Context, id uint) error
 }
 
 type productRepository struct {
@@ -28,24 +31,28 @@ func NewProductRepository(db *gorm.DB) ProductRepository {
 	}
 }
 
-func (r *productRepository) CreateProduct(product *models.Product) error {
-	result := r.DB.Create(product)
+func (r *productRepository) CreateProduct(ctx context.Context, product *models.Product) error {
+	result := r.DB.WithContext(ctx).Create(product)
 	return result.Error
 }
 
-func (r *productRepository) GetProductByID(id uint) (*models.Product, error) {
+func (r *productRepository) GetProductByID(ctx context.Context, id uint) (*models.Product, error) {
 	var product models.Product
 	// Preload Category untuk mendapatkan data kategori sekalian
-	result := r.DB.Preload("Category").First(&product, id)
+	result := r.DB.WithContext(ctx).Preload("Category").First(&product, id)
 	return &product, result.Error
 }
 
-func (r *productRepository) GetAllProducts(limit, offset int, search string, stockFilter string, sortBy string, sortOrder string) ([]models.Product, int64, error) {
+func (r *productRepository) GetAllProducts(ctx context.Context, limit, offset int, search string, stockFilter string, sortBy string, sortOrder string, onlyTrashed bool) ([]models.Product, int64, error) {
 	var products []models.Product
 	var totalItems int64
 
 	// Base query for counting and fetching
-	query := r.DB.Model(&models.Product{})
+	query := r.DB.WithContext(ctx).Model(&models.Product{})
+
+	if onlyTrashed {
+		query = query.Unscoped().Where("deleted_at IS NOT NULL")
+	}
 
 	if search != "" {
 		searchTerm := "%" + search + "%"
@@ -63,7 +70,8 @@ func (r *productRepository) GetAllProducts(limit, offset int, search string, sto
 	}
 
 	// Hitung total items sebelum limit/offset
-	if err := query.Count(&totalItems).Error; err != nil {
+	// Gunakan Session(&gorm.Session{}) untuk clone query agar tidak mengubah state query asli
+	if err := query.Session(&gorm.Session{}).Count(&totalItems).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -85,30 +93,40 @@ func (r *productRepository) GetAllProducts(limit, offset int, search string, sto
 	return products, totalItems, err
 }
 
-func (r *productRepository) UpdateProduct(product *models.Product) error {
+func (r *productRepository) UpdateProduct(ctx context.Context, product *models.Product) error {
 	// Save akan mengupdate semua field, termasuk CategoryID
-	result := r.DB.Save(product)
+	result := r.DB.WithContext(ctx).Save(product)
 	return result.Error
 }
 
-func (r *productRepository) GetLowStockProducts(threshold int) ([]models.Product, error) {
+func (r *productRepository) GetLowStockProducts(ctx context.Context, threshold int) ([]models.Product, error) {
 	var products []models.Product
-	result := r.DB.Preload("Category").Where("stock <= ?", threshold).Order("stock ASC").Find(&products)
+	result := r.DB.WithContext(ctx).Preload("Category").Where("stock <= ?", threshold).Order("stock ASC").Find(&products)
 	return products, result.Error
 }
 
-func (r *productRepository) DeleteProduct(id uint) error {
-	result := r.DB.Delete(&models.Product{}, id)
+func (r *productRepository) DeleteProduct(ctx context.Context, id uint) error {
+	result := r.DB.WithContext(ctx).Delete(&models.Product{}, id)
 	return result.Error
 }
 
-func (r *productRepository) GetStockCounts() (map[string]int64, error) {
+func (r *productRepository) RestoreProduct(ctx context.Context, id uint) error {
+	result := r.DB.WithContext(ctx).Unscoped().Model(&models.Product{}).Where("id = ?", id).Update("deleted_at", nil)
+	return result.Error
+}
+
+func (r *productRepository) ForceDeleteProduct(ctx context.Context, id uint) error {
+	result := r.DB.WithContext(ctx).Unscoped().Delete(&models.Product{}, id)
+	return result.Error
+}
+
+func (r *productRepository) GetStockCounts(ctx context.Context) (map[string]int64, error) {
 	var all, high, low, out int64
 
-	r.DB.Model(&models.Product{}).Count(&all)
-	r.DB.Model(&models.Product{}).Where("stock >= 10").Count(&high)
-	r.DB.Model(&models.Product{}).Where("stock > 0 AND stock < 10").Count(&low)
-	r.DB.Model(&models.Product{}).Where("stock = 0").Count(&out)
+	r.DB.WithContext(ctx).Model(&models.Product{}).Count(&all)
+	r.DB.WithContext(ctx).Model(&models.Product{}).Where("stock >= 10").Count(&high)
+	r.DB.WithContext(ctx).Model(&models.Product{}).Where("stock > 0 AND stock < 10").Count(&low)
+	r.DB.WithContext(ctx).Model(&models.Product{}).Where("stock = 0").Count(&out)
 
 	return map[string]int64{
 		"all":  all,
