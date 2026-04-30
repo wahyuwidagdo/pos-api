@@ -50,9 +50,9 @@ func (_m *CategoryRepository) DeleteCategory(ctx context.Context, id uint) error
 	return r0
 }
 
-// GetAllCategories provides a mock function with given fields: ctx
-func (_m *CategoryRepository) GetAllCategories(ctx context.Context) ([]models.Category, error) {
-	ret := _m.Called(ctx)
+// GetAllCategories provides a mock function with given fields: ctx, onlyTrashed
+func (_m *CategoryRepository) GetAllCategories(ctx context.Context, onlyTrashed bool) ([]models.Category, error) {
+	ret := _m.Called(ctx, onlyTrashed)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAllCategories")
@@ -60,19 +60,19 @@ func (_m *CategoryRepository) GetAllCategories(ctx context.Context) ([]models.Ca
 
 	var r0 []models.Category
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]models.Category, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, bool) ([]models.Category, error)); ok {
+		return rf(ctx, onlyTrashed)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []models.Category); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, bool) []models.Category); ok {
+		r0 = rf(ctx, onlyTrashed)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.Category)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, bool) error); ok {
+		r1 = rf(ctx, onlyTrashed)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -121,6 +121,42 @@ func (_m *CategoryRepository) UpdateCategory(ctx context.Context, category *mode
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *models.Category) error); ok {
 		r0 = rf(ctx, category)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// RestoreCategory provides a mock function with given fields: ctx, id
+func (_m *CategoryRepository) RestoreCategory(ctx context.Context, id uint) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RestoreCategory")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ForceDeleteCategory provides a mock function with given fields: ctx, id
+func (_m *CategoryRepository) ForceDeleteCategory(ctx context.Context, id uint) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ForceDeleteCategory")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint) error); ok {
+		r0 = rf(ctx, id)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -5,6 +5,7 @@ package mocks
 import (
 	context "context"
 	models "pos-api/internal/models"
+	time "time"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -32,41 +33,22 @@ func (_m *InventoryLogRepository) Create(ctx context.Context, log *models.Invent
 	return r0
 }
 
-// GetAll provides a mock function with given fields: ctx, limit, offset, logType, source
-func (_m *InventoryLogRepository) GetAll(ctx context.Context, limit int, offset int, logType string, source string) ([]models.InventoryLog, int64, error) {
-	ret := _m.Called(ctx, limit, offset, logType, source)
+// ProcessAdjustment provides a mock function with given fields: ctx, log, product
+func (_m *InventoryLogRepository) ProcessAdjustment(ctx context.Context, log *models.InventoryLog, product *models.Product) error {
+	ret := _m.Called(ctx, log, product)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetAll")
+		panic("no return value specified for ProcessAdjustment")
 	}
 
-	var r0 []models.InventoryLog
-	var r1 int64
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, string) ([]models.InventoryLog, int64, error)); ok {
-		return rf(ctx, limit, offset, logType, source)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, string) []models.InventoryLog); ok {
-		r0 = rf(ctx, limit, offset, logType, source)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.InventoryLog, *models.Product) error); ok {
+		r0 = rf(ctx, log, product)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]models.InventoryLog)
-		}
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, int, string, string) int64); ok {
-		r1 = rf(ctx, limit, offset, logType, source)
-	} else {
-		r1 = ret.Get(1).(int64)
-	}
-
-	if rf, ok := ret.Get(2).(func(context.Context, int, int, string, string) error); ok {
-		r2 = rf(ctx, limit, offset, logType, source)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0
 }
 
 // GetByProductID provides a mock function with given fields: ctx, productID, limit, offset
@@ -104,6 +86,73 @@ func (_m *InventoryLogRepository) GetByProductID(ctx context.Context, productID 
 	}
 
 	return r0, r1, r2
+}
+
+// GetAll provides a mock function with given fields: ctx, limit, offset, logType, source, startDate, endDate
+func (_m *InventoryLogRepository) GetAll(ctx context.Context, limit int, offset int, logType string, source string, startDate *time.Time, endDate *time.Time) ([]models.InventoryLog, int64, error) {
+	ret := _m.Called(ctx, limit, offset, logType, source, startDate, endDate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAll")
+	}
+
+	var r0 []models.InventoryLog
+	var r1 int64
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, string, *time.Time, *time.Time) ([]models.InventoryLog, int64, error)); ok {
+		return rf(ctx, limit, offset, logType, source, startDate, endDate)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int, int, string, string, *time.Time, *time.Time) []models.InventoryLog); ok {
+		r0 = rf(ctx, limit, offset, logType, source, startDate, endDate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.InventoryLog)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int, int, string, string, *time.Time, *time.Time) int64); ok {
+		r1 = rf(ctx, limit, offset, logType, source, startDate, endDate)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, int, int, string, string, *time.Time, *time.Time) error); ok {
+		r2 = rf(ctx, limit, offset, logType, source, startDate, endDate)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// GetStats provides a mock function with given fields: ctx, startDate, endDate
+func (_m *InventoryLogRepository) GetStats(ctx context.Context, startDate *time.Time, endDate *time.Time) (map[string]int64, error) {
+	ret := _m.Called(ctx, startDate, endDate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStats")
+	}
+
+	var r0 map[string]int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *time.Time, *time.Time) (map[string]int64, error)); ok {
+		return rf(ctx, startDate, endDate)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *time.Time, *time.Time) map[string]int64); ok {
+		r0 = rf(ctx, startDate, endDate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]int64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *time.Time, *time.Time) error); ok {
+		r1 = rf(ctx, startDate, endDate)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewInventoryLogRepository creates a new instance of InventoryLogRepository. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

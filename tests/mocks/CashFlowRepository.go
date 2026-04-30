@@ -5,6 +5,7 @@ package mocks
 import (
 	context "context"
 	models "pos-api/internal/models"
+	repositories "pos-api/internal/repositories"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -120,7 +121,7 @@ func (_m *CashFlowRepository) GetByID(ctx context.Context, id uint) (*models.Cas
 }
 
 // GetSummary provides a mock function with given fields: ctx, startDate, endDate
-func (_m *CashFlowRepository) GetSummary(ctx context.Context, startDate time.Time, endDate time.Time) (float64, float64, error) {
+func (_m *CashFlowRepository) GetSummary(ctx context.Context, startDate time.Time, endDate time.Time) (float64, float64, float64, error) {
 	ret := _m.Called(ctx, startDate, endDate)
 
 	if len(ret) == 0 {
@@ -129,8 +130,9 @@ func (_m *CashFlowRepository) GetSummary(ctx context.Context, startDate time.Tim
 
 	var r0 float64
 	var r1 float64
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, time.Time) (float64, float64, error)); ok {
+	var r2 float64
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, time.Time) (float64, float64, float64, error)); ok {
 		return rf(ctx, startDate, endDate)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, time.Time, time.Time) float64); ok {
@@ -145,13 +147,49 @@ func (_m *CashFlowRepository) GetSummary(ctx context.Context, startDate time.Tim
 		r1 = ret.Get(1).(float64)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, time.Time, time.Time) error); ok {
+	if rf, ok := ret.Get(2).(func(context.Context, time.Time, time.Time) float64); ok {
 		r2 = rf(ctx, startDate, endDate)
 	} else {
-		r2 = ret.Error(2)
+		r2 = ret.Get(2).(float64)
 	}
 
-	return r0, r1, r2
+	if rf, ok := ret.Get(3).(func(context.Context, time.Time, time.Time) error); ok {
+		r3 = rf(ctx, startDate, endDate)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
+}
+
+// GetSourceBreakdown provides a mock function with given fields: ctx, startDate, endDate
+func (_m *CashFlowRepository) GetSourceBreakdown(ctx context.Context, startDate time.Time, endDate time.Time) ([]repositories.CashFlowSourceData, error) {
+	ret := _m.Called(ctx, startDate, endDate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSourceBreakdown")
+	}
+
+	var r0 []repositories.CashFlowSourceData
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, time.Time) ([]repositories.CashFlowSourceData, error)); ok {
+		return rf(ctx, startDate, endDate)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, time.Time) []repositories.CashFlowSourceData); ok {
+		r0 = rf(ctx, startDate, endDate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]repositories.CashFlowSourceData)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, time.Time, time.Time) error); ok {
+		r1 = rf(ctx, startDate, endDate)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Update provides a mock function with given fields: ctx, cf
