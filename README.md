@@ -121,9 +121,9 @@ Untuk dokumentasi lengkap beserta request/response bodynya, silakan akses **Swag
    cp .env.example .env
    ```
 3. **Isi konfigurasi `.env`**:
-   Atur koneksi database PostgreSQL Anda.
+   Atur koneksi database PostgreSQL Anda sesuai dengan kredensial yang diinginkan. File `.env` ini akan dibaca secara otomatis oleh Docker maupun aplikasi lokal.
    ```env
-   DB_HOST=127.0.0.1
+   DB_HOST=localhost # Gunakan 'db' jika menggunakan Docker
    DB_PORT=5432
    DB_USER=postgres
    DB_PASSWORD=password_anda
@@ -145,17 +145,34 @@ Untuk dokumentasi lengkap beserta request/response bodynya, silakan akses **Swag
 
 ## ▶️ Cara Menjalankan Aplikasi
 
-**1. Menjalankan Server Utama:**
-Gunakan perintah berikut untuk menjalankan backend API:
-```bash
-go run cmd/api/main.go
-```
-Jika berhasil, server akan berjalan di port yang ditentukan di `.env` (misal: `http://localhost:8000`).
+Anda dapat menjalankan aplikasi ini menggunakan **Docker** (Sangat Disarankan) atau secara lokal.
 
-**2. Memasukkan Data Awal (Seeding) - Opsional:**
-Jika ini pertama kalinya Anda menjalankan aplikasi dan butuh data awalan (seperti akun Admin/Kasir default, kategori dummy, atau produk dummy), buka terminal baru dan jalankan seeder:
+### Opsi A: Menjalankan dengan Docker Compose
+Cara ini sangat mudah karena secara otomatis menjalankan server API beserta database PostgreSQL.
+1. Pastikan Anda telah mensetup `.env`.
+2. Jalankan perintah:
+   ```bash
+   docker-compose up -d --build
+   ```
+3. API akan berjalan di port `8080` (sesuai konfigurasi docker-compose). Untuk melihat log: `docker-compose logs -f app`.
+
+### Opsi B: Menjalankan secara Lokal
+1. Pastikan PostgreSQL sudah jalan di komputer Anda.
+2. Jalankan perintah:
+   ```bash
+   go run cmd/api/main.go
+   ```
+
+### 🗃️ Memasukkan Data Awal (Seeding) - Opsional
+Jika ini pertama kalinya Anda menjalankan aplikasi dan butuh data awalan (seperti akun Admin/Kasir default, kategori dummy, atau produk dummy), jalankan seeder berikut.
+
+*Jika via lokal:*
 ```bash
 go run cmd/seeder/main.go
+```
+*Jika via Docker:*
+```bash
+docker-compose exec app go run cmd/seeder/main.go
 ```
 
 ---
