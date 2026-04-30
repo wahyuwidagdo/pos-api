@@ -21,6 +21,13 @@ go.work
 
 # Environment variables
 .env
+.env.*
+!.env.example
+
+# Docker local data volumes
+# Note: Dockerfile and docker-compose.yml MUST NOT be ignored
+docker-data/
+pgdata/
 
 # IDE specific files
 .idea/
