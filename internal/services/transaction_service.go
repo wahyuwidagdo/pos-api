@@ -41,7 +41,7 @@ type PaginationData struct {
 type TransactionService interface {
 	ProcessTransaction(ctx context.Context, req TransactionRequest) (*models.Transaction, error)
 	GetTransaction(ctx context.Context, id uint) (*models.Transaction, error)
-	ListTransactions(ctx context.Context, page int, limit int) (*PaginationData, error)
+	ListTransactions(ctx context.Context, page int, limit int, search, startDate, endDate string) (*PaginationData, error)
 	CancelTransaction(ctx context.Context, id uint) error
 	ReturnTransaction(ctx context.Context, id uint) error
 }
@@ -74,7 +74,7 @@ func (s *transactionService) GetTransaction(ctx context.Context, id uint) (*mode
 	return transaction, nil
 }
 
-func (s *transactionService) ListTransactions(ctx context.Context, page int, limit int) (*PaginationData, error) {
+func (s *transactionService) ListTransactions(ctx context.Context, page int, limit int, search, startDate, endDate string) (*PaginationData, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -82,7 +82,7 @@ func (s *transactionService) ListTransactions(ctx context.Context, page int, lim
 		limit = 10
 	}
 
-	transactions, totalItem, err := s.repo.ListTransactions(ctx, page, limit)
+	transactions, totalItem, err := s.repo.ListTransactions(ctx, page, limit, search, startDate, endDate)
 
 	if err != nil {
 		// Asumsi error yang dikembalikan adalah error database, tidak perlu penanganan not found

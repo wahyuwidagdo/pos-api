@@ -76,9 +76,12 @@ func (h *TransactionHandler) ListTransactions(c *fiber.Ctx) error {
 	// 1. Parse Query Params
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 10)
+	search := c.Query("search", "")
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
 
 	// 2. Panggil Service Layer
-	paginationData, err := h.service.ListTransactions(c.UserContext(), page, limit)
+	paginationData, err := h.service.ListTransactions(c.UserContext(), page, limit, search, startDate, endDate)
 
 	// 3. Handle Error
 	if err != nil {

@@ -84,7 +84,7 @@ func (h *ExportHandler) ExportProductsCSV(c *fiber.Ctx) error {
 // @Router       /export/transactions/csv [get]
 func (h *ExportHandler) ExportTransactionsCSV(c *fiber.Ctx) error {
 	// Fetch all transactions for export (page 1, large limit)
-	paginationData, err := h.transactionService.ListTransactions(c.UserContext(), 1, 10000)
+	paginationData, err := h.transactionService.ListTransactions(c.UserContext(), 1, 10000, "", "", "")
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to fetch transactions",

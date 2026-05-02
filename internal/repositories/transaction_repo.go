@@ -14,7 +14,7 @@ type TransactionRepository interface {
 	// ProcessFullTransaction runs all operations (stock, transaction, detail) within a single DB Transaction.
 	ProcessFullTransaction(ctx context.Context, transaction *models.Transaction) error
 	GetTransactionByID(ctx context.Context, id uint) (*models.Transaction, error)
-	ListTransactions(ctx context.Context, page int, limit int) ([]models.Transaction, int64, error)
+	ListTransactions(ctx context.Context, page int, limit int, search, startDate, endDate string) ([]models.Transaction, int64, error)
 	UpdateTransactionState(ctx context.Context, transaction *models.Transaction, status string, eventName string) error
 }
 
@@ -43,19 +43,31 @@ func (r *transactionRepository) GetTransactionByID(ctx context.Context, id uint)
 	return &transaction, nil
 }
 
-func (r *transactionRepository) ListTransactions(ctx context.Context, page int, limit int) ([]models.Transaction, int64, error) {
+func (r *transactionRepository) ListTransactions(ctx context.Context, page int, limit int, search, startDate, endDate string) ([]models.Transaction, int64, error) {
 	var transactions []models.Transaction
 	var total int64
 
 	offset := (page - 1) * limit
+	query := r.DB.Model(&models.Transaction{})
+
+	if search != "" {
+		query = query.Where("transaction_code ILIKE ?", "%"+search+"%")
+	}
+	if startDate != "" && endDate != "" {
+		query = query.Where("created_at >= ? AND created_at <= ?", startDate+" 00:00:00", endDate+" 23:59:59")
+	} else if startDate != "" {
+		query = query.Where("created_at >= ?", startDate+" 00:00:00")
+	} else if endDate != "" {
+		query = query.Where("created_at <= ?", endDate+" 23:59:59")
+	}
 
 	// Count total records first
-	if err := r.DB.Model(&models.Transaction{}).Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// Fetch paginated data
-	result := r.DB.WithContext(ctx).
+	result := query.WithContext(ctx).
 		Preload("TransactionDetails").
 		Preload("TransactionDetails.Product").
 		Order("created_at DESC"). // Best practice to show newest first
