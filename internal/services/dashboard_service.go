@@ -14,6 +14,9 @@ type DashboardResponse struct {
 	TodayTransactions      int64                             `json:"today_transactions"`
 	TodayItemsSold         int64                             `json:"today_items_sold"`
 	LowStockCount          int64                             `json:"low_stock_count"`
+	SalesDiff              float64                           `json:"sales_diff"`
+	TransactionsDiff       float64                           `json:"transactions_diff"`
+	ItemsSoldDiff          float64                           `json:"items_sold_diff"`
 	TopProducts            []repositories.TopProduct         `json:"top_products"`
 	RevenueTrend           []repositories.RevenueData        `json:"revenue_trend"`
 	RecentTransactions     []repositories.TransactionSummary `json:"recent_transactions"`
@@ -68,6 +71,44 @@ func parseDateRange(dateRange string) (time.Time, time.Time) {
 	}
 }
 
+// getPreviousDateRange returns the equivalent previous period for comparison
+func getPreviousDateRange(dateRange string) (time.Time, time.Time) {
+	now := time.Now()
+	switch dateRange {
+	case "this_week":
+		weekday := int(now.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		thisWeekStart := time.Date(now.Year(), now.Month(), now.Day()-(weekday-1), 0, 0, 0, 0, now.Location())
+		prevStart := thisWeekStart.AddDate(0, 0, -7)
+		return prevStart, thisWeekStart
+	case "this_month":
+		thisMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		prevStart := thisMonthStart.AddDate(0, -1, 0)
+		return prevStart, thisMonthStart
+	case "this_year":
+		thisYearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+		prevStart := thisYearStart.AddDate(-1, 0, 0)
+		return prevStart, thisYearStart
+	default: // "today" → compare with yesterday
+		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		prevStart := todayStart.Add(-24 * time.Hour)
+		return prevStart, todayStart
+	}
+}
+
+// calcDiffPercent calculates the percentage change between current and previous values
+func calcDiffPercent(current, previous float64) float64 {
+	if previous == 0 {
+		if current > 0 {
+			return 100
+		}
+		return 0
+	}
+	return ((current - previous) / previous) * 100
+}
+
 // GetDashboard retrieves dashboard data for the given date range
 func (s *dashboardService) GetDashboard(ctx context.Context, dateRange string) (*DashboardResponse, error) {
 	startDate, endDate := parseDateRange(dateRange)
@@ -77,6 +118,19 @@ func (s *dashboardService) GetDashboard(ctx context.Context, dateRange string) (
 	if err != nil {
 		return nil, err
 	}
+
+	// Get previous period stats for comparison
+	prevStart, prevEnd := getPreviousDateRange(dateRange)
+	prevStats, err := s.repo.GetDashboardStats(ctx, prevStart, prevEnd)
+	if err != nil {
+		fmt.Println("Error fetching previous period stats:", err)
+		prevStats = &repositories.DashboardStats{}
+	}
+
+	// Calculate percentage diffs
+	salesDiff := calcDiffPercent(stats.TodaySales, prevStats.TodaySales)
+	transactionsDiff := calcDiffPercent(float64(stats.TodayTransactions), float64(prevStats.TodayTransactions))
+	itemsSoldDiff := calcDiffPercent(float64(stats.TodayItemsSold), float64(prevStats.TodayItemsSold))
 
 	// Get top 5 products
 	topProducts, err := s.repo.GetTopProducts(ctx, startDate, endDate, 5)
@@ -136,6 +190,9 @@ func (s *dashboardService) GetDashboard(ctx context.Context, dateRange string) (
 		TodayTransactions:      stats.TodayTransactions,
 		TodayItemsSold:         stats.TodayItemsSold,
 		LowStockCount:          lowStockCount,
+		SalesDiff:              salesDiff,
+		TransactionsDiff:       transactionsDiff,
+		ItemsSoldDiff:          itemsSoldDiff,
 		TopProducts:            topProducts,
 		RevenueTrend:           revenueTrend,
 		RecentTransactions:     recentTransactions,
@@ -144,3 +201,4 @@ func (s *dashboardService) GetDashboard(ctx context.Context, dateRange string) (
 		CashFlowBreakdown:      cashFlowBreakdown,
 	}, nil
 }
+
